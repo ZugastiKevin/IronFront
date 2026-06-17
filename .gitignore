@@ -1,6 +1,7 @@
 # Symfony Framework Bundle
 /.env
 /.env.test
+/.env.dev
 /.env.local
 /.env.local.php
 /.env.*.local
