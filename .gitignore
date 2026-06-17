@@ -76,3 +76,16 @@ yarn-error.log
 
 # Embedded web-server pid file
 /.web-server-pid
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Symfony profiler (dev environment)
+.var/
+
+# Logs
+*.log
