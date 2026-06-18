@@ -1,5 +1,7 @@
 twig:
     file_name_pattern: '*.twig'
+    globals:
+        front_debug: '%app.front_debug%'
 
 when@test:
     twig:
