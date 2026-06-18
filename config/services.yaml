@@ -32,10 +32,10 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
-    App\EventSubscriber\AccessDeniedSubscriber:
+    App\Domain\Events\AccessDeniedSubscriber:
         tags: [kernel.event_subscriber]
 
-    App\EventSubscriber\LocaleSubscriber:
+    App\Domain\Events\LocaleSubscriber:
         arguments:
             $defaultLocale: '%locale%'
         tags:
