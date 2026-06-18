@@ -1,7 +1,8 @@
 .PHONY: install deploy
+SSH := C:/Windows/System32/OpenSSH/ssh.exe
 
 deploy:
-	ssh o2switch 'cd repositories/IronFront && git pull origin main && make install'
+	$(SSH) -A o2switch 'cd repositories/IronFront && git pull origin main && make install'
 
 install: vendor/autoload.php
 	php bin/console doctrine:migrations:migrate -n
