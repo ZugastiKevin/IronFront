@@ -7,6 +7,13 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    locale: 'fr'
+    site.name_site: 'IronFront'
+    site.name_publisher: 'Zugasti Kevin'
+    site.address: '123 Rue Principale, 12345 QuelquePars'
+    site.phone: '+33 1 23 45 67 89'
+    site.email: 'contact@monsite.fr'
+    app.front_debug: '%env(bool:FRONT_DEBUG)%'
 
 services:
     # default configuration for services in *this* file
@@ -18,6 +25,26 @@ services:
     # this creates a service per class whose id is the fully-qualified class name
     App\:
         resource: '../src/'
+        exclude:
+            - '../src/DependencyInjection/'
+            - '../src/Entity/'
+            - '../src/Kernel.php'
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+    App\EventSubscriber\LocaleSubscriber:
+        arguments:
+            $defaultLocale: '%locale%'
+        tags:
+            - { name: kernel.event_subscriber }
+
+    Imagine\Image\ImagineInterface:
+        class: Imagine\Gd\Imagine
+
+    App\Controller\Api\DeliveryController:
+        arguments:
+            $hub: '@mercure.hub.default'
+
+    App\Service\MercureService:
+        arguments:
+            $hub: '@mercure.hub.default'
