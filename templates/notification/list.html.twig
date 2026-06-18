@@ -1,0 +1,16 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}list{% endblock %}
+
+{% block body %}
+    <ul>
+        {% for n in notifications %}
+            <li>
+                {{ n.message }}
+                <small>{{ n.created_at|date('d/m/Y H:i') }}</small>
+            </li>
+        {% else %}
+            <li>Aucune notification</li>
+        {% endfor %}
+    </ul>
+{% endblock %}

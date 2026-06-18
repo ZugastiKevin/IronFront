@@ -32,6 +32,9 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+    App\EventSubscriber\AccessDeniedSubscriber:
+        tags: [kernel.event_subscriber]
+
     App\EventSubscriber\LocaleSubscriber:
         arguments:
             $defaultLocale: '%locale%'
@@ -41,10 +44,5 @@ services:
     Imagine\Image\ImagineInterface:
         class: Imagine\Gd\Imagine
 
-    App\Controller\Api\DeliveryController:
-        arguments:
-            $hub: '@mercure.hub.default'
-
-    App\Service\MercureService:
-        arguments:
-            $hub: '@mercure.hub.default'
+    # Event Publisher
+    App\Domain\Events\EventPublisher: '@App\Infrastructure\DatabaseEventPublisher'

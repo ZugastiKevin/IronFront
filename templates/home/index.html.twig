@@ -64,7 +64,13 @@
                 </table>
             </div>
 
-            <a href="{{ path('game') }}">Game</a>
+            <div id="notifications"
+                hx-get="/notifications"
+                hx-trigger="load, every 3s"
+                hx-swap="innerHTML">
+            </div>
+
+            {# <a href="{{ path('game') }}">Game</a> #}
         </div>
     </section>
 {% endblock %}
