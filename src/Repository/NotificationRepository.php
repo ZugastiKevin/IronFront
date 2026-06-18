@@ -1,5 +1,7 @@
 <?php
 
+namespace App\Repository;
+
 use Doctrine\DBAL\Connection;
 
 final class NotificationRepository
