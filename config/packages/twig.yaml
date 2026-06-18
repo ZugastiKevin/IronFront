@@ -1,6 +1,11 @@
 twig:
     file_name_pattern: '*.twig'
     globals:
+        site_name: '%site.name_site%'
+        site_publisher: '%site.name_publisher%'
+        site_address: '%site.address%'
+        site_phone: '%site.phone%'
+        site_email: '%site.email%'
         front_debug: '%app.front_debug%'
 
 when@test:
