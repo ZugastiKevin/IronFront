@@ -1,14 +1,16 @@
-.PHONY: install deploy
-SSH := C:/Windows/System32/OpenSSH/ssh.exe
+SHELL := C:/Windows/System32/cmd.exe
+.SHELLFLAGS := /C
+
+.PHONY: deploy
 
 deploy:
-	$(SSH) -A o2switch 'cd repositories/IronFront && git pull origin main && make install'
+	powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\Users\rocha\Documents\PowerShell\deploy.ps1
 
 install: vendor/autoload.php
+	composer dump-env prod
 	php bin/console doctrine:migrations:migrate -n
 	php bin/console importmap:install
 	php bin/console asset-map:compile
-	composer dump-env prod
 	php bin/console cache:clear
 
 vendor/autoload.php: composer.lock composer.json
