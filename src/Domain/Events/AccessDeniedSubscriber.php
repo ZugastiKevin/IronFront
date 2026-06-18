@@ -5,17 +5,15 @@ namespace App\Domain\Events;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
-use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\Routing\RouterInterface;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
-class AccessDeniedSubscriber implements EventSubscriberInterface
+final class AccessDeniedSubscriber implements EventSubscriberInterface
 {
-    private $router;
-
-    public function __construct(RouterInterface $router)
-    {
-        $this->router = $router;
+    public function __construct(
+        private readonly RouterInterface $router,
+    ) {
     }
 
     public static function getSubscribedEvents(): array
@@ -30,9 +28,15 @@ class AccessDeniedSubscriber implements EventSubscriberInterface
         $exception = $event->getThrowable();
         $request = $event->getRequest();
 
-        if ($exception instanceof AccessDeniedException && str_starts_with($request->getPathInfo(), '/admin')) {
-            $response = new RedirectResponse($this->router->generate('home'));
-            $event->setResponse($response);
+        if (
+            $exception instanceof AccessDeniedException
+            && str_starts_with($request->getPathInfo(), '/admin')
+        ) {
+            $event->setResponse(
+                new RedirectResponse(
+                    $this->router->generate('home')
+                )
+            );
         }
     }
 }
