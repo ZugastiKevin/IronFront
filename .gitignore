@@ -6,7 +6,7 @@
 /.env.local.php
 /.env.*.local
 /config/secrets/prod/prod.decrypt.private.php
-/public/bundles/
+#/public/bundles/
 /var/
 /vendor/
 
@@ -20,7 +20,7 @@
 
 # Symfony Webpack Encore
 /node_modules/
-# /public/build/
+#/public/build/
 npm-debug.log
 yarn-error.log
 
@@ -89,9 +89,3 @@ yarn-error.log
 
 # Logs
 *.log
-###> symfony/webpack-encore-bundle ###
-/node_modules/
-/public/build/
-npm-debug.log
-yarn-error.log
-###< symfony/webpack-encore-bundle ###
