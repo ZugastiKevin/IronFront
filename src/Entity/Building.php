@@ -61,7 +61,7 @@ class Building
     #[ORM\OneToOne(targetEntity: ResourceDeposit::class)]
     private ?ResourceDeposit $resourceDeposit = null;
 
-    #[ORM\OneToMany(targetEntity: ResourceDelivery::class, mappedBy: 'sourceBuilding')]
+    #[ORM\OneToMany(targetEntity: Delivery::class, mappedBy: 'sourceBuilding')]
     private $deliveries;
 
     public function __construct()
@@ -195,14 +195,14 @@ class Building
     }
 
     /**
-     * @return \Doctrine\Common\Collections\Collection|ResourceDelivery[]
+     * @return \Doctrine\Common\Collections\Collection|Delivery[]
      */
     public function getDeliveries(): \Doctrine\Common\Collections\Collection
     {
         return $this->deliveries;
     }
 
-    public function addDelivery(ResourceDelivery $delivery): static
+    public function addDelivery(Delivery $delivery): static
     {
         if (!$this->deliveries->contains($delivery)) {
             $this->deliveries->add($delivery);

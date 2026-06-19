@@ -1,0 +1,83 @@
+<?php
+
+declare(strict_types=1);
+
+namespace DoctrineMigrations;
+
+use Doctrine\DBAL\Schema\Schema;
+use Doctrine\Migrations\AbstractMigration;
+
+/**
+ * Auto-generated Migration: Please modify to your needs!
+ */
+final class Version20260619192128 extends AbstractMigration
+{
+    public function getDescription(): string
+    {
+        return '';
+    }
+
+    public function up(Schema $schema): void
+    {
+        // this up() migration is auto-generated, please modify it to your needs
+        $this->addSql('CREATE TABLE delivery (id INT AUTO_INCREMENT NOT NULL, quantity INT NOT NULL, status VARCHAR(20) NOT NULL, created_at DATETIME NOT NULL, waypoints JSON DEFAULT NULL, scheduled_at DATETIME NOT NULL, delivered_at DATETIME DEFAULT NULL, progress INT NOT NULL, estimated_time INT NOT NULL, user_id INT NOT NULL, resource_id INT NOT NULL, source_building_id INT NOT NULL, target_building_id INT NOT NULL, game_id INT NOT NULL, INDEX IDX_3781EC10A76ED395 (user_id), INDEX IDX_3781EC1089329D25 (resource_id), INDEX IDX_3781EC1071552EB2 (source_building_id), INDEX IDX_3781EC10CA103118 (target_building_id), INDEX IDX_3781EC10E48FD905 (game_id), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4');
+        $this->addSql('ALTER TABLE delivery ADD CONSTRAINT FK_3781EC10A76ED395 FOREIGN KEY (user_id) REFERENCES user (id)');
+        $this->addSql('ALTER TABLE delivery ADD CONSTRAINT FK_3781EC1089329D25 FOREIGN KEY (resource_id) REFERENCES resource_type (id)');
+        $this->addSql('ALTER TABLE delivery ADD CONSTRAINT FK_3781EC1071552EB2 FOREIGN KEY (source_building_id) REFERENCES building (id)');
+        $this->addSql('ALTER TABLE delivery ADD CONSTRAINT FK_3781EC10CA103118 FOREIGN KEY (target_building_id) REFERENCES building (id)');
+        $this->addSql('ALTER TABLE delivery ADD CONSTRAINT FK_3781EC10E48FD905 FOREIGN KEY (game_id) REFERENCES game (id)');
+        $this->addSql('DROP TABLE resource_delivery');
+        $this->addSql('ALTER TABLE building ADD CONSTRAINT FK_E16F61D4F28401B9 FOREIGN KEY (building_type_id) REFERENCES building_type (id)');
+        $this->addSql('ALTER TABLE building ADD CONSTRAINT FK_E16F61D4A76ED395 FOREIGN KEY (user_id) REFERENCES user (id)');
+        $this->addSql('ALTER TABLE building ADD CONSTRAINT FK_E16F61D4E48FD905 FOREIGN KEY (game_id) REFERENCES game (id)');
+        $this->addSql('ALTER TABLE building ADD CONSTRAINT FK_E16F61D48BD543CD FOREIGN KEY (chunk_id) REFERENCES chunk (id)');
+        $this->addSql('ALTER TABLE building ADD CONSTRAINT FK_E16F61D4F80DA337 FOREIGN KEY (resource_deposit_id) REFERENCES resource_deposit (id)');
+        $this->addSql('ALTER TABLE building_cost ADD CONSTRAINT FK_BE02E3A8F28401B9 FOREIGN KEY (building_type_id) REFERENCES building_type (id)');
+        $this->addSql('ALTER TABLE building_cost ADD CONSTRAINT FK_BE02E3A898EC6B7B FOREIGN KEY (resource_type_id) REFERENCES resource_type (id)');
+        $this->addSql('ALTER TABLE building_type ADD CONSTRAINT FK_2AFA207D98EC6B7B FOREIGN KEY (resource_type_id) REFERENCES resource_type (id)');
+        $this->addSql('ALTER TABLE faction_building_image ADD CONSTRAINT FK_64AA84374448F8DA FOREIGN KEY (faction_id) REFERENCES faction (id)');
+        $this->addSql('ALTER TABLE faction_building_image ADD CONSTRAINT FK_64AA8437F28401B9 FOREIGN KEY (building_type_id) REFERENCES building_type (id)');
+        $this->addSql('ALTER TABLE game_resource_deposit ADD CONSTRAINT FK_F66ABDCDE48FD905 FOREIGN KEY (game_id) REFERENCES game (id)');
+        $this->addSql('ALTER TABLE game_resource_deposit ADD CONSTRAINT FK_F66ABDCDF80DA337 FOREIGN KEY (resource_deposit_id) REFERENCES resource_deposit (id)');
+        $this->addSql('ALTER TABLE player_inventory ADD CONSTRAINT FK_11217F0F99E6F5DF FOREIGN KEY (player_id) REFERENCES user (id)');
+        $this->addSql('ALTER TABLE player_inventory ADD CONSTRAINT FK_11217F0F98EC6B7B FOREIGN KEY (resource_type_id) REFERENCES resource_type (id)');
+        $this->addSql('ALTER TABLE player_inventory ADD CONSTRAINT FK_11217F0FE48FD905 FOREIGN KEY (game_id) REFERENCES game (id)');
+        $this->addSql('ALTER TABLE resource_deposit ADD CONSTRAINT FK_C87B7AD198EC6B7B FOREIGN KEY (resource_type_id) REFERENCES resource_type (id)');
+        $this->addSql('ALTER TABLE resource_deposit ADD CONSTRAINT FK_C87B7AD1962F8178 FOREIGN KEY (road_id) REFERENCES road (id)');
+        $this->addSql('ALTER TABLE road ADD CONSTRAINT FK_95C0C4B18BD543CD FOREIGN KEY (chunk_id) REFERENCES chunk (id)');
+        $this->addSql('ALTER TABLE user ADD CONSTRAINT FK_8D93D649E48FD905 FOREIGN KEY (game_id) REFERENCES game (id)');
+        $this->addSql('ALTER TABLE user ADD CONSTRAINT FK_8D93D6494448F8DA FOREIGN KEY (faction_id) REFERENCES faction (id)');
+    }
+
+    public function down(Schema $schema): void
+    {
+        // this down() migration is auto-generated, please modify it to your needs
+        $this->addSql('CREATE TABLE resource_delivery (id INT AUTO_INCREMENT NOT NULL, quantity INT NOT NULL, status VARCHAR(20) CHARACTER SET utf8mb4 NOT NULL COLLATE `utf8mb4_0900_ai_ci`, created_at DATETIME NOT NULL, waypoints JSON DEFAULT NULL, scheduled_at DATETIME NOT NULL, delivered_at DATETIME DEFAULT NULL, progress INT NOT NULL, estimated_time INT NOT NULL, user_id INT NOT NULL, resource_id INT NOT NULL, source_building_id INT NOT NULL, target_building_id INT NOT NULL, game_id INT NOT NULL, INDEX IDX_990D26BDA76ED395 (user_id), INDEX IDX_990D26BD89329D25 (resource_id), INDEX IDX_990D26BD71552EB2 (source_building_id), INDEX IDX_990D26BDCA103118 (target_building_id), INDEX IDX_990D26BDE48FD905 (game_id), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_0900_ai_ci` ENGINE = MyISAM COMMENT = \'\' ');
+        $this->addSql('ALTER TABLE delivery DROP FOREIGN KEY FK_3781EC10A76ED395');
+        $this->addSql('ALTER TABLE delivery DROP FOREIGN KEY FK_3781EC1089329D25');
+        $this->addSql('ALTER TABLE delivery DROP FOREIGN KEY FK_3781EC1071552EB2');
+        $this->addSql('ALTER TABLE delivery DROP FOREIGN KEY FK_3781EC10CA103118');
+        $this->addSql('ALTER TABLE delivery DROP FOREIGN KEY FK_3781EC10E48FD905');
+        $this->addSql('DROP TABLE delivery');
+        $this->addSql('ALTER TABLE building DROP FOREIGN KEY FK_E16F61D4F28401B9');
+        $this->addSql('ALTER TABLE building DROP FOREIGN KEY FK_E16F61D4A76ED395');
+        $this->addSql('ALTER TABLE building DROP FOREIGN KEY FK_E16F61D4E48FD905');
+        $this->addSql('ALTER TABLE building DROP FOREIGN KEY FK_E16F61D48BD543CD');
+        $this->addSql('ALTER TABLE building DROP FOREIGN KEY FK_E16F61D4F80DA337');
+        $this->addSql('ALTER TABLE building_cost DROP FOREIGN KEY FK_BE02E3A8F28401B9');
+        $this->addSql('ALTER TABLE building_cost DROP FOREIGN KEY FK_BE02E3A898EC6B7B');
+        $this->addSql('ALTER TABLE building_type DROP FOREIGN KEY FK_2AFA207D98EC6B7B');
+        $this->addSql('ALTER TABLE faction_building_image DROP FOREIGN KEY FK_64AA84374448F8DA');
+        $this->addSql('ALTER TABLE faction_building_image DROP FOREIGN KEY FK_64AA8437F28401B9');
+        $this->addSql('ALTER TABLE game_resource_deposit DROP FOREIGN KEY FK_F66ABDCDE48FD905');
+        $this->addSql('ALTER TABLE game_resource_deposit DROP FOREIGN KEY FK_F66ABDCDF80DA337');
+        $this->addSql('ALTER TABLE player_inventory DROP FOREIGN KEY FK_11217F0F99E6F5DF');
+        $this->addSql('ALTER TABLE player_inventory DROP FOREIGN KEY FK_11217F0F98EC6B7B');
+        $this->addSql('ALTER TABLE player_inventory DROP FOREIGN KEY FK_11217F0FE48FD905');
+        $this->addSql('ALTER TABLE resource_deposit DROP FOREIGN KEY FK_C87B7AD198EC6B7B');
+        $this->addSql('ALTER TABLE resource_deposit DROP FOREIGN KEY FK_C87B7AD1962F8178');
+        $this->addSql('ALTER TABLE road DROP FOREIGN KEY FK_95C0C4B18BD543CD');
+        $this->addSql('ALTER TABLE user DROP FOREIGN KEY FK_8D93D649E48FD905');
+        $this->addSql('ALTER TABLE user DROP FOREIGN KEY FK_8D93D6494448F8DA');
+    }
+}

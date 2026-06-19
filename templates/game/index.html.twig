@@ -1,0 +1,22 @@
+{% extends 'base.html.twig' %}
+
+{% block javascripts %}
+    {{ parent() }}
+    {{ encore_entry_script_tags('game') }}
+{% endblock %}
+
+{% block title %}game{% endblock %}
+
+{% block body %}
+    {{ encore_entry_link_tags('app') }}
+    {{ encore_entry_script_tags('app') }}
+    <section id="game">
+        {% include 'layout/_sidebar.html.twig' with {
+            'hasBase': hasBase,
+            'buildingTypes': buildingTypes
+        } %}
+        <div class="game container">
+            <div id="map"></div>
+        </div>
+    </section>
+{% endblock %}

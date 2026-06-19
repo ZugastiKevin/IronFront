@@ -40,8 +40,8 @@ class Game
     #[ORM\OneToMany(targetEntity: GameResourceDeposit::class, mappedBy: 'game', orphanRemoval: true)]
     private Collection $gameResourceDeposits;
 
-    #[ORM\OneToMany(mappedBy: 'game', targetEntity: ResourceDelivery::class, orphanRemoval: true)]
-    private Collection $resourceDeliveries;
+    #[ORM\OneToMany(mappedBy: 'game', targetEntity: Delivery::class, orphanRemoval: true)]
+    private Collection $Deliveries;
 
     #[ORM\OneToMany(mappedBy: 'game', targetEntity: Building::class, orphanRemoval: true)]
     private Collection $buildings;
@@ -50,7 +50,7 @@ class Game
     {
         $this->users = new ArrayCollection();
         $this->gameResourceDeposits = new ArrayCollection();
-        $this->resourceDeliveries = new ArrayCollection();
+        $this->Deliveries = new ArrayCollection();
         $this->buildings = new ArrayCollection();
     }
 
@@ -184,26 +184,26 @@ class Game
     }
 
     /**
-     * @return Collection<int, ResourceDelivery>
+     * @return Collection<int, Delivery>
      */
-    public function getResourceDeliveries(): Collection
+    public function getDeliveries(): Collection
     {
-        return $this->resourceDeliveries;
+        return $this->Deliveries;
     }
 
-    public function addResourceDelivery(ResourceDelivery $delivery): static
+    public function addDelivery(Delivery $delivery): static
     {
-        if (!$this->resourceDeliveries->contains($delivery)) {
-            $this->resourceDeliveries->add($delivery);
+        if (!$this->Deliveries->contains($delivery)) {
+            $this->Deliveries->add($delivery);
             $delivery->setGame($this);
         }
 
         return $this;
     }
 
-    public function removeResourceDelivery(ResourceDelivery $delivery): static
+    public function removeDelivery(Delivery $delivery): static
     {
-        if ($this->resourceDeliveries->removeElement($delivery)) {
+        if ($this->Deliveries->removeElement($delivery)) {
             if ($delivery->getGame() === $this) {
                 $delivery->setGame(null);
             }

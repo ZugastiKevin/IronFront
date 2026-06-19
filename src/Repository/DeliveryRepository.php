@@ -4,16 +4,16 @@ namespace App\Repository;
 
 use App\Entity\Building;
 use App\Entity\Game;
-use App\Entity\ResourceDelivery;
+use App\Entity\Delivery;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
-class ResourceDeliveryRepository extends ServiceEntityRepository
+class DeliveryRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
     {
-        parent::__construct($registry, ResourceDelivery::class);
+        parent::__construct($registry, Delivery::class);
     }
 
     /**
@@ -24,7 +24,7 @@ class ResourceDeliveryRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('d')
             ->where('d.status = :status')
             ->andWhere('d.scheduledAt <= :now')
-            ->setParameter('status', ResourceDelivery::STATUS_WAITING)
+            ->setParameter('status', Delivery::STATUS_WAITING)
             ->setParameter('now', $now)
             ->getQuery()
             ->getResult();
@@ -45,7 +45,7 @@ class ResourceDeliveryRepository extends ServiceEntityRepository
             ->andWhere('d.status IN (:statuses)')
             ->setParameter('user', $user)
             ->setParameter('resourceCode', $resourceCode)
-            ->setParameter('statuses', [ResourceDelivery::STATUS_WAITING, ResourceDelivery::STATUS_PENDING, ResourceDelivery::STATUS_IN_TRANSIT])
+            ->setParameter('statuses', [Delivery::STATUS_WAITING, Delivery::STATUS_PENDING, Delivery::STATUS_IN_TRANSIT])
             ->getQuery()
             ->getSingleScalarResult();
 
@@ -69,7 +69,7 @@ class ResourceDeliveryRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('d')
             ->where('d.status = :status')
             ->andWhere('d.progress >= :minProgress')
-            ->setParameter('status', ResourceDelivery::STATUS_IN_TRANSIT)
+            ->setParameter('status', Delivery::STATUS_IN_TRANSIT)
             ->setParameter('minProgress', $minProgress)
             ->getQuery()
             ->getResult();
@@ -83,7 +83,7 @@ class ResourceDeliveryRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('d')
             ->where('d.status = :status')
             ->andWhere('d.game = :game')
-            ->setParameter('status', ResourceDelivery::STATUS_IN_TRANSIT)
+            ->setParameter('status', Delivery::STATUS_IN_TRANSIT)
             ->setParameter('game', $game)
             ->getQuery()
             ->getResult();
@@ -92,13 +92,13 @@ class ResourceDeliveryRepository extends ServiceEntityRepository
     /**
      * Trouve une livraison en attente ou en transit pour un bâtiment donné
      */
-    public function findPendingByBuilding(int $buildingId): ?ResourceDelivery
+    public function findPendingByBuilding(int $buildingId): ?Delivery
     {
         return $this->createQueryBuilder('d')
             ->where('d.sourceBuilding = :buildingId')
             ->andWhere('d.status IN (:statuses)')
             ->setParameter('buildingId', $buildingId)
-            ->setParameter('statuses', [ResourceDelivery::STATUS_PENDING, ResourceDelivery::STATUS_IN_TRANSIT])
+            ->setParameter('statuses', [Delivery::STATUS_PENDING, Delivery::STATUS_IN_TRANSIT])
             ->orderBy('d.createdAt', 'DESC')
             ->setMaxResults(1)
             ->getQuery()
@@ -110,14 +110,14 @@ class ResourceDeliveryRepository extends ServiceEntityRepository
      * Le bâtiment peut être source (producteur) ou cible (base)
      * Retourne null si pas de livraison
      */
-    public function findNextDepartureByBuilding(int $buildingId): ?ResourceDelivery
+    public function findNextDepartureByBuilding(int $buildingId): ?Delivery
     {
         // Chercher par sourceBuilding d'abord
         $delivery = $this->createQueryBuilder('d')
             ->where('d.sourceBuilding = :buildingId')
             ->andWhere('d.status IN (:statuses)')
             ->setParameter('buildingId', $buildingId)
-            ->setParameter('statuses', [ResourceDelivery::STATUS_WAITING, ResourceDelivery::STATUS_PENDING, ResourceDelivery::STATUS_IN_TRANSIT])
+            ->setParameter('statuses', [Delivery::STATUS_WAITING, Delivery::STATUS_PENDING, Delivery::STATUS_IN_TRANSIT])
             ->orderBy('d.createdAt', 'ASC')
             ->setMaxResults(1)
             ->getQuery()
@@ -129,7 +129,7 @@ class ResourceDeliveryRepository extends ServiceEntityRepository
                 ->where('d.targetBuilding = :buildingId')
                 ->andWhere('d.status IN (:statuses)')
                 ->setParameter('buildingId', $buildingId)
-                ->setParameter('statuses', [ResourceDelivery::STATUS_WAITING, ResourceDelivery::STATUS_PENDING, ResourceDelivery::STATUS_IN_TRANSIT])
+                ->setParameter('statuses', [Delivery::STATUS_WAITING, Delivery::STATUS_PENDING, Delivery::STATUS_IN_TRANSIT])
                 ->orderBy('d.createdAt', 'ASC')
                 ->setMaxResults(1)
                 ->getQuery()
@@ -147,7 +147,7 @@ class ResourceDeliveryRepository extends ServiceEntityRepository
     public function getTimeUntilNextDeparture(int $buildingId): ?int
     {
         $now = new \DateTimeImmutable();
-        $statuses = [ResourceDelivery::STATUS_WAITING, ResourceDelivery::STATUS_PENDING, ResourceDelivery::STATUS_IN_TRANSIT];
+        $statuses = [Delivery::STATUS_WAITING, Delivery::STATUS_PENDING, Delivery::STATUS_IN_TRANSIT];
 
         // Chercher la prochaine livraison par sourceBuilding (producteur)
         $delivery = $this->createQueryBuilder('d')
@@ -214,7 +214,7 @@ class ResourceDeliveryRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('d')
             ->where('d.status = :status')
             ->andWhere('d.scheduledAt <= :now')
-            ->setParameter('status', ResourceDelivery::STATUS_WAITING)
+            ->setParameter('status', Delivery::STATUS_WAITING)
             ->setParameter('now', $now)
             ->getQuery()
             ->getResult();
@@ -229,7 +229,7 @@ class ResourceDeliveryRepository extends ServiceEntityRepository
             ->where('d.status = :status')
             ->andWhere('d.user = :user')
             ->andWhere('d.waypoints IS NOT NULL')
-            ->setParameter('status', ResourceDelivery::STATUS_IN_TRANSIT)
+            ->setParameter('status', Delivery::STATUS_IN_TRANSIT)
             ->setParameter('user', $user)
             ->getQuery()
             ->getResult();
@@ -243,7 +243,7 @@ class ResourceDeliveryRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('d')
             ->where('d.status = :status')
             ->andWhere('d.waypoints IS NOT NULL')
-            ->setParameter('status', ResourceDelivery::STATUS_IN_TRANSIT)
+            ->setParameter('status', Delivery::STATUS_IN_TRANSIT)
             ->getQuery()
             ->getResult();
     }
@@ -252,21 +252,21 @@ class ResourceDeliveryRepository extends ServiceEntityRepository
      * Vérifie si une livraison WAITING existe pour un bâtiment à une heure donnée
      * @deprecated Utilisée uniquement dans les tests, remplacer par hasWaitingDeliveryForBuilding
      */
-    public function findWaitingForBuildingAt(Building $building, \DateTimeImmutable $scheduledAt): ?ResourceDelivery
+    public function findWaitingForBuildingAt(Building $building, \DateTimeImmutable $scheduledAt): ?Delivery
     {
         return $this->createQueryBuilder('d')
             ->where('d.sourceBuilding = :building')
             ->andWhere('d.status = :status')
             ->andWhere('d.scheduledAt = :scheduledAt')
             ->setParameter('building', $building)
-            ->setParameter('status', ResourceDelivery::STATUS_WAITING)
+            ->setParameter('status', Delivery::STATUS_WAITING)
             ->setParameter('scheduledAt', $scheduledAt)
             ->getQuery()
             ->getOneOrNullResult();
     }
 
     // Trouver une livraison par bâtiment et scheduledAt exact
-    public function findByBuildingAndScheduledAt(Building $building, \DateTimeImmutable $scheduledAt): ?ResourceDelivery
+    public function findByBuildingAndScheduledAt(Building $building, \DateTimeImmutable $scheduledAt): ?Delivery
     {
         return $this->createQueryBuilder('d')
             ->where('d.sourceBuilding = :building')
@@ -286,13 +286,13 @@ class ResourceDeliveryRepository extends ServiceEntityRepository
             ->where('d.sourceBuilding = :building')
             ->andWhere('d.status = :status')
             ->setParameter('building', $building)
-            ->setParameter('status', ResourceDelivery::STATUS_WAITING)
+            ->setParameter('status', Delivery::STATUS_WAITING)
             ->getQuery()
             ->getSingleScalarResult();
     }
 
     // Trouve la dernière livraison programmée pour un bâtiment
-    public function findLatestScheduledDelivery(Building $building): ?ResourceDelivery
+    public function findLatestScheduledDelivery(Building $building): ?Delivery
     {
         return $this->createQueryBuilder('d')
             ->where('d.sourceBuilding = :building')
@@ -303,13 +303,13 @@ class ResourceDeliveryRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
-    public function findLastDeliveredForBuilding(Building $building): ?ResourceDelivery
+    public function findLastDeliveredForBuilding(Building $building): ?Delivery
     {
         return $this->createQueryBuilder('d')
             ->where('d.sourceBuilding = :building')
             ->andWhere('d.status = :status')
             ->setParameter('building', $building)
-            ->setParameter('status', ResourceDelivery::STATUS_DELIVERED)
+            ->setParameter('status', Delivery::STATUS_DELIVERED)
             ->orderBy('d.scheduledAt', 'DESC')
             ->setMaxResults(1)
             ->getQuery()

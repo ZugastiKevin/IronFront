@@ -14,7 +14,7 @@ use Doctrine\ORM\Mapping as ORM;
         new ORM\Index(name: 'idx_game_created_at', columns: ['game_id', 'created_at'])
     ]
 )]
-class ResourceDelivery
+class Delivery
 {
     public const STATUS_WAITING = 'waiting';
     public const STATUS_PENDING = 'pending';
