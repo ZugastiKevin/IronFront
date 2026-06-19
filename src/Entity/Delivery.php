@@ -63,7 +63,7 @@ class Delivery
     #[ORM\Column(type: Types::INTEGER)]
     private int $estimatedTime = 0;
 
-    #[ORM\ManyToOne(targetEntity: Game::class, inversedBy: 'resourceDeliveries')]
+    #[ORM\ManyToOne(targetEntity: Game::class, inversedBy: 'Deliveries')]
     #[ORM\JoinColumn(nullable: false)]
     private ?Game $game = null;
 

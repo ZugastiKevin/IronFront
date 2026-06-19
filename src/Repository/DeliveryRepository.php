@@ -34,7 +34,7 @@ class DeliveryRepository extends ServiceEntityRepository
      * Vérifie s'il y a des livraisons en attente/pendant pour une ressource donnée
      * Utilisé pour éviter les doublons de production
      */
-    public function hasPendingDeliveryForResource(\App\Entity\User $user, string $resourceCode): bool
+    public function hasPendingDeliveryForResource(User $user, string $resourceCode): bool
     {
         $result = $this->createQueryBuilder('d')
             ->select('COUNT(d.id)')

@@ -46,12 +46,16 @@ class Game
     #[ORM\OneToMany(mappedBy: 'game', targetEntity: Building::class, orphanRemoval: true)]
     private Collection $buildings;
 
+    #[ORM\OneToMany(mappedBy: 'game', targetEntity: PlayerInventory::class, orphanRemoval: true)]
+    private Collection $playerInventories;
+
     public function __construct()
     {
         $this->users = new ArrayCollection();
         $this->gameResourceDeposits = new ArrayCollection();
         $this->Deliveries = new ArrayCollection();
         $this->buildings = new ArrayCollection();
+        $this->playerInventories = new ArrayCollection();
     }
 
     public function __toString(): string
@@ -218,5 +222,34 @@ class Game
     public function getBuildings(): Collection
     {
         return $this->buildings;
+    }
+
+    public function addBuilding(Building $building): static
+    {
+        if (!$this->buildings->contains($building)) {
+            $this->buildings->add($building);
+            $building->setGame($this);
+        }
+
+        return $this;
+    }
+
+    public function removeBuilding(Building $building): static
+    {
+        if ($this->buildings->removeElement($building)) {
+            if ($building->getGame() === $this) {
+                $building->setGame(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, PlayerInventory>
+     */
+    public function getPlayerInventories(): Collection
+    {
+        return $this->playerInventories;
     }
 }
