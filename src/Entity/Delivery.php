@@ -7,13 +7,10 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\HasLifecycleCallbacks]
-#[ORM\Table(
-    indexes: [
-        new ORM\Index(name: 'idx_game_status', columns: ['game_id', 'status']),
-        new ORM\Index(name: 'idx_game_scheduled_at', columns: ['game_id', 'scheduled_at']),
-        new ORM\Index(name: 'idx_game_created_at', columns: ['game_id', 'created_at'])
-    ]
-)]
+#[ORM\Table]
+#[ORM\Index(name: 'idx_game_status', columns: ['game_id', 'status'])]
+#[ORM\Index(name: 'idx_game_scheduled_at', columns: ['game_id', 'scheduled_at'])]
+#[ORM\Index(name: 'idx_game_created_at', columns: ['game_id', 'created_at'])]
 class Delivery
 {
     public const STATUS_WAITING = 'waiting';

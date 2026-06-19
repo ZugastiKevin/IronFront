@@ -8,13 +8,10 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: BuildingRepository::class)]
 #[ORM\HasLifecycleCallbacks]
-#[ORM\Table(
-    indexes: [
-        new ORM\Index(name: 'idx_building_game', columns: ['game_id']),
-        new ORM\Index(name: 'idx_building_user', columns: ['user_id']),
-        new ORM\Index(name: 'idx_building_game_user', columns: ['game_id', 'user_id'])
-    ]
-)]
+#[ORM\Table]
+#[ORM\Index(name: 'idx_building_game', columns: ['game_id'])]
+#[ORM\Index(name: 'idx_building_user', columns: ['user_id'])]
+#[ORM\Index(name: 'idx_building_game_user', columns: ['game_id', 'user_id'])]
 class Building
 {
     #[ORM\Id]
