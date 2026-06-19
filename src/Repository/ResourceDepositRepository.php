@@ -1,0 +1,63 @@
+<?php
+
+namespace App\Repository;
+
+use App\Entity\Game;
+use App\Entity\GameResourceDeposit;
+use App\Entity\ResourceDeposit;
+use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\Persistence\ManagerRegistry;
+
+/**
+ * @extends ServiceEntityRepository<ResourceDeposit>
+ */
+class ResourceDepositRepository extends ServiceEntityRepository
+{
+    public function __construct(ManagerRegistry $registry)
+    {
+        parent::__construct($registry, ResourceDeposit::class);
+    }
+
+    public function findNearestAvailable(Game $game, float $lat, float $lng, float $radius = 0.005): ?ResourceDeposit
+    {
+        return $this->createQueryBuilder('r')
+            ->leftJoin(
+                GameResourceDeposit::class,
+                'grd',
+                'WITH',
+                'grd.resourceDeposit = r.id AND grd.game = :game'
+            )
+            ->where('grd.isClaimed IS NULL OR grd.isClaimed = false')
+            ->andWhere('ABS(r.latitude - :lat) < :radius')
+            ->andWhere('ABS(r.longitude - :lng) < :radius')
+            ->setParameter('game', $game)
+            ->setParameter('lat', $lat)
+            ->setParameter('lng', $lng)
+            ->setParameter('radius', $radius)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    public function findByChunkId(string $chunkId): array
+    {
+        return $this->createQueryBuilder('d')
+            ->join('d.road', 'r')
+            ->join('r.chunk', 'c')
+            ->where('c.chunkId = :chunkId')
+            ->setParameter('chunkId', $chunkId)
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function findByChunkIdSafe(string $chunkId): array
+    {
+        try {
+            return $this->findByChunkId($chunkId);
+        } catch (\Exception $e) {
+            // Log l'erreur et retourne un tableau vide
+            error_log('ResourceDeposit findByChunkId error: ' . $e->getMessage());
+            return [];
+        }
+    }
+}
