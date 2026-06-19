@@ -7,6 +7,9 @@ framework:
 
     #esi: true
     #fragments: true
+    form:
+        csrf_protection:
+            field_attr: []
 
 when@test:
     framework:
