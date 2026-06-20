@@ -20,7 +20,7 @@ class ResourceDepositRepository extends ServiceEntityRepository
     public function findNearestAvailable(Game $game, float $lat, float $lng, float $radius = 0.005): ?ResourceDeposit {
         return $this->createQueryBuilder('r')
             ->leftJoin('r.gameResourceDeposits', 'grd', 'WITH', 'grd.game = :game')
-            ->where('grd.id IS NULL OR grd.isClaimed = false')
+            ->where('grd.id IS NULL OR grd.isCaptured = false')
             ->andWhere('ABS(r.latitude - :lat) < :radius')
             ->andWhere('ABS(r.longitude - :lng) < :radius')
             ->setParameter('game', $game)

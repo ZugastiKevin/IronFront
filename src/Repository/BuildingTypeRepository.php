@@ -19,7 +19,7 @@ class BuildingTypeRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('bt')
             ->where('bt.category = :category')
             ->setParameter('category', $category)
-            ->orderBy('bt.name', 'ASC')
+            ->orderBy('bt.label', 'ASC')
             ->getQuery()
             ->getResult();
     }

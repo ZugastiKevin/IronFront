@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Service\Game;
+namespace App\Service\Game\Player;
 
+use App\Entity\Player;
 use App\Entity\PlayerInventory;
-use App\Entity\User;
 use App\Repository\ResourceTypeRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -17,10 +17,15 @@ class InventoryInitializer
     /**
      * Initialise les inventaires d'un joueur avec toutes les ressources à 0.
      */
-    public function initialize(User $user): void
+    public function initialize(Player $player): void
     {
+        // Si pas de player, ne rien faire
+        if ($player === null) {
+            return;
+        }
+
         // Vérifier si le joueur a déjà des inventaires
-        if ($user->getPlayerInventories()->count() > 0) {
+        if ($player->getPlayerInventories()->count() > 0) {
             return;
         }
 
@@ -28,7 +33,7 @@ class InventoryInitializer
 
         foreach ($resourceTypes as $resourceType) {
             $inventory = new PlayerInventory();
-            $inventory->setPlayer($user);
+            $inventory->setPlayer($player);
             $inventory->setResourceType($resourceType);
             $inventory->setQuantity(0);
             $inventory->setUpdatedAt(new \DateTimeImmutable());

@@ -1,14 +1,11 @@
 <?php
-
 namespace App\Form;
-
 use App\Entity\Faction;
 use App\Entity\Game;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
-
 class FactionGameChoiceType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
@@ -39,13 +36,15 @@ class FactionGameChoiceType extends AbstractType
                 },
                 'expanded' => true,
                 'multiple' => false,
-                'required' => true,
+                // Non requis ici : un player existant sur la game choisie n'a pas besoin de faction.
+                // La présence de la faction est vérifiée manuellement dans le controller
+                // uniquement quand un nouveau player doit être créé.
+                'required' => false,
                 'mapped' => false,
                 'data' => $options['faction_data'] ?? null,
             ])
         ;
     }
-
     public function configureOptions(OptionsResolver $resolver): void
     {
         $resolver->setDefaults([

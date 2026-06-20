@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Service\Game;
+namespace App\Service\Game\Player;
 
-use App\Entity\User;
+use App\Entity\Player;
 use App\Repository\PlayerInventoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -14,12 +14,16 @@ class StartingResourcesInitializer
     ) {
     }
 
-    public function initialize(User $user): void
+    public function initialize(Player $player): void
     {
+        if ($player === null) {
+            return;
+        }
+
         // Quantités de départ
         $startingResources = ['iron' => 100, 'iron_ingot' => 30, 'oil' => 100, 'latex' => 30,];
 
-        foreach ($this->playerInventoryRepository->findByPlayer($user) as $inventory) {
+        foreach ($this->playerInventoryRepository->findByPlayer($player) as $inventory) {
 
             $code = $inventory->getResourceType()->getCode();
 
