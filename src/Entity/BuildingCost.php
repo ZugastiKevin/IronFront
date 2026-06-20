@@ -34,7 +34,7 @@ class BuildingCost
         return $this->costs;
     }
 
-    public function setCosts(int $costs): self
+    public function setCosts(int $costs): static
     {
         $this->costs = $costs; return $this;
     }
@@ -44,7 +44,7 @@ class BuildingCost
         return $this->resourceType;
     }
 
-    public function setResourceType(?ResourceType $resourceType): self
+    public function setResourceType(?ResourceType $resourceType): static
     {
         $this->resourceType = $resourceType; return $this;
     }
@@ -54,7 +54,7 @@ class BuildingCost
         return $this->buildingType;
     }
 
-    public function setBuildingType(?BuildingType $bt): self
+    public function setBuildingType(?BuildingType $bt): static
     {
         $this->buildingType = $bt; return $this;
     }

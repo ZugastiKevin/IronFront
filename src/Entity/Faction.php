@@ -17,7 +17,7 @@ class Faction
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(length: 191)]
     private ?string $label = null;
 
     #[ORM\Column(length: 100, unique: true)]
@@ -27,10 +27,10 @@ class Faction
     private ?string $description = null;
 
     /**
-     * @var Collection<int, User>
+     * @var Collection<int, Player>
      */
-    #[ORM\OneToMany(targetEntity: User::class, mappedBy: 'faction')]
-    private Collection $users;
+    #[ORM\OneToMany(targetEntity: Player::class, mappedBy: 'faction')]
+    private Collection $players;
 
     /**
      * @var Collection<int, FactionBuildingImage>
@@ -40,7 +40,7 @@ class Faction
 
     public function __construct()
     {
-        $this->users = new ArrayCollection();
+        $this->players = new ArrayCollection();
         $this->factionBuildingImages = new ArrayCollection();
     }
 
@@ -86,29 +86,18 @@ class Faction
     }
 
     /**
-     * @return Collection<int, User>
+     * @return Collection<int, Player>
      */
-    public function getUsers(): Collection
+    public function getPlayers(): Collection
     {
-        return $this->users;
+        return $this->players;
     }
 
-    public function addUser(User $user): static
+    public function addPlayer(Player $player): static
     {
-        if (!$this->users->contains($user)) {
-            $this->users->add($user);
-            $user->setFaction($this);
-        }
-
-        return $this;
-    }
-
-    public function removeUser(User $user): static
-    {
-        if ($this->users->removeElement($user)) {
-            if ($user->getFaction() === $this) {
-                $user->setFaction(null);
-            }
+        if (!$this->players->contains($player)) {
+            $this->players->add($player);
+            $player->setFaction($this);
         }
 
         return $this;

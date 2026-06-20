@@ -47,7 +47,7 @@ class Road
         return $this->chunk;
     }
 
-    public function setChunk(?Chunk $chunk): self
+    public function setChunk(?Chunk $chunk): static
     {
         $this->chunk = $chunk;
         return $this;
@@ -58,7 +58,7 @@ class Road
         return $this->points;
     }
 
-    public function setPoints(array $points): self
+    public function setPoints(array $points): static
     {
         $this->points = $points;
         return $this;
@@ -69,7 +69,7 @@ class Road
         return $this->type;
     }
 
-    public function setType(string $type): self
+    public function setType(string $type): static
     {
         $this->type = $type;
         return $this;

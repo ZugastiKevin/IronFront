@@ -14,7 +14,7 @@ class FactionBuildingImage
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(length: 191)]
     private ?string $imagePath = null;
 
     private ?UploadedFile $imageFile = null;

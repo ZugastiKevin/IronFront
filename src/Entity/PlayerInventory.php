@@ -7,7 +7,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: PlayerInventoryRepository::class)]
 #[ORM\Table(name: 'player_inventory')]
-#[ORM\UniqueConstraint(name: 'user_resource_unique', fields: ['player', 'resourceType'])]
+#[ORM\UniqueConstraint(name: 'player_resource_unique', fields: ['player', 'resourceType'])]
 class PlayerInventory
 {
     #[ORM\Id]
@@ -18,9 +18,9 @@ class PlayerInventory
     #[ORM\Column]
     private int $quantity = 0;
 
-    #[ORM\ManyToOne(inversedBy: 'playerInventories', targetEntity: User::class)]
+    #[ORM\ManyToOne(inversedBy: 'playerInventories', targetEntity: Player::class)]
     #[ORM\JoinColumn(nullable: false)]
-    private ?User $player = null;
+    private ?Player $player = null;
 
     #[ORM\ManyToOne(targetEntity: ResourceType::class)]
     private ?ResourceType $resourceType = null;
@@ -30,10 +30,6 @@ class PlayerInventory
      */
     #[ORM\Column]
     private ?\DateTimeImmutable $updatedAt = null;
-
-    #[ORM\ManyToOne(inversedBy: 'playerInventories', targetEntity: Game::class)]
-    #[ORM\JoinColumn(nullable: false)]
-    private ?Game $game = null;
 
     public function __construct()
     {
@@ -57,12 +53,12 @@ class PlayerInventory
         return $this;
     }
 
-    public function getPlayer(): ?User
+    public function getPlayer(): ?Player
     {
         return $this->player;
     }
 
-    public function setPlayer(User $player): static
+    public function setPlayer(Player $player): static
     {
         $this->player = $player;
 
@@ -89,18 +85,6 @@ class PlayerInventory
     public function setUpdatedAt(\DateTimeImmutable $updatedAt): static
     {
         $this->updatedAt = $updatedAt;
-
-        return $this;
-    }
-
-    public function getGame(): ?Game
-    {
-        return $this->game;
-    }
-
-    public function setGame(?Game $game): static
-    {
-        $this->game = $game;
 
         return $this;
     }

@@ -23,7 +23,7 @@ class GameResourceDeposit
     private ?ResourceDeposit $resourceDeposit = null;
 
     #[ORM\Column]
-    private bool $isClaimed = false;
+    private bool $isCaptured = false;
 
     public function getId(): ?int
     {
@@ -54,14 +54,14 @@ class GameResourceDeposit
         return $this;
     }
 
-    public function isClaimed(): bool
+    public function isCaptured(): bool
     {
-        return $this->isClaimed;
+        return $this->isCaptured;
     }
 
-    public function setIsClaimed(bool $isClaimed): static
+    public function setIsCaptured(bool $isCaptured): static
     {
-        $this->isClaimed = $isClaimed;
+        $this->isCaptured = $isCaptured;
 
         return $this;
     }

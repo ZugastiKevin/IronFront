@@ -16,13 +16,13 @@ class BuildingType
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(length: 191)]
     private ?string $label = null;
 
     #[ORM\Column(length: 100, unique: true)]
     private ?string $code = null;
 
-    #[ORM\Column(enumType: BuildingCategory::class)]
+    #[ORM\Column(type: 'string',length: 191, enumType: BuildingCategory::class)]
     private BuildingCategory $category;
 
     #[ORM\Column]
@@ -201,7 +201,7 @@ class BuildingType
     /** @return Collection<int, BuildingCost> */
     public function getCosts(): Collection { return $this->costs; }
 
-    public function addCost(BuildingCost $cost): self
+    public function addCost(BuildingCost $cost): static
     {
         if (!$this->costs->contains($cost)) {
             $this->costs->add($cost);
@@ -210,7 +210,7 @@ class BuildingType
         return $this;
     }
     
-    public function removeCost(BuildingCost $cost): self
+    public function removeCost(BuildingCost $cost): static
     {
         if ($this->costs->removeElement($cost)) {
             if ($cost->getBuildingType() === $this) {

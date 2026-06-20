@@ -2,16 +2,18 @@
 
 namespace App\Entity;
 
+use App\Enum\BuildingStatus;
 use App\Repository\BuildingRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: BuildingRepository::class)]
 #[ORM\HasLifecycleCallbacks]
 #[ORM\Table]
-#[ORM\Index(name: 'idx_building_game', columns: ['game_id'])]
-#[ORM\Index(name: 'idx_building_user', columns: ['user_id'])]
-#[ORM\Index(name: 'idx_building_game_user', columns: ['game_id', 'user_id'])]
+#[ORM\Index(name: 'idx_building_player', columns: ['player_id'])]
+#[ORM\Index(name: 'idx_building_chunk', columns: ['chunk_id'])]
 class Building
 {
     #[ORM\Id]
@@ -37,7 +39,7 @@ class Building
     private ?float $longitudeBuild = null;
 
     #[ORM\Column]
-    private ?int $level = null;
+    private ?int $level = 1;
 
     #[ORM\ManyToOne(inversedBy: 'buildings')]
     #[ORM\JoinColumn(nullable: false)]
@@ -45,25 +47,28 @@ class Building
 
     #[ORM\ManyToOne(inversedBy: 'buildings')]
     #[ORM\JoinColumn(nullable: false)]
-    private ?User $user = null;
-
-    #[ORM\ManyToOne(inversedBy: 'buildings')]
-    #[ORM\JoinColumn(nullable: false)]
-    private ?Game $game = null;
+    private ?Player $player = null;
 
     #[ORM\ManyToOne(targetEntity: Chunk::class, inversedBy: 'buildings')]
     #[ORM\JoinColumn(nullable: false)]
     private ?Chunk $chunk = null;
 
-    #[ORM\OneToOne(targetEntity: ResourceDeposit::class)]
+    #[ORM\OneToOne(targetEntity: ResourceDeposit::class, mappedBy: 'building')]
     private ?ResourceDeposit $resourceDeposit = null;
 
     #[ORM\OneToMany(targetEntity: Delivery::class, mappedBy: 'sourceBuilding')]
-    private $deliveries;
+    private Collection $deliveries;
+
+    #[ORM\OneToMany(targetEntity: Delivery::class, mappedBy: 'targetBuilding')]
+    private Collection $incomingDeliveries;
+
+    #[ORM\Column(type: 'string',length: 191, enumType: BuildingStatus::class)]
+    private BuildingStatus $status = BuildingStatus::UNDER_CONSTRUCTION;
 
     public function __construct()
     {
-        $this->deliveries = new \Doctrine\Common\Collections\ArrayCollection();
+        $this->deliveries = new ArrayCollection();
+        $this->incomingDeliveries = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -130,26 +135,14 @@ class Building
         return $this;
     }
 
-    public function getUser(): ?User
+    public function getPlayer(): ?Player
     {
-        return $this->user;
+        return $this->player;
     }
 
-    public function setUser(?User $user): static
+    public function setPlayer(?Player $player): static
     {
-        $this->user = $user;
-
-        return $this;
-    }
-
-    public function getGame(): ?Game
-    {
-        return $this->game;
-    }
-
-    public function setGame(?Game $game): static
-    {
-        $this->game = $game;
+        $this->player = $player;
 
         return $this;
     }
@@ -159,7 +152,7 @@ class Building
         return $this->chunk;
     }
 
-    public function setChunk(?Chunk $chunk): self
+    public function setChunk(?Chunk $chunk): static
     {
         $this->chunk = $chunk;
 
@@ -192,19 +185,43 @@ class Building
     }
 
     /**
-     * @return \Doctrine\Common\Collections\Collection|Delivery[]
+     * @return Collection<int, Delivery>
      */
-    public function getDeliveries(): \Doctrine\Common\Collections\Collection
+    public function getIncomingDeliveries(): Collection
     {
-        return $this->deliveries;
+        return $this->incomingDeliveries;
     }
 
-    public function addDelivery(Delivery $delivery): static
+    public function addIncomingDelivery(Delivery $delivery): static
     {
-        if (!$this->deliveries->contains($delivery)) {
-            $this->deliveries->add($delivery);
-            $delivery->setSourceBuilding($this);
+        if (!$this->incomingDeliveries->contains($delivery)) {
+            $this->incomingDeliveries->add($delivery);
+            $delivery->setTargetBuilding($this);
         }
+
+        return $this;
+    }
+
+    public function removeIncomingDelivery(Delivery $delivery): static
+    {
+        if ($this->incomingDeliveries->removeElement($delivery)) {
+            if ($delivery->getTargetBuilding() === $this) {
+                $delivery->setTargetBuilding(null);
+            }
+        }
+
+        return $this;
+    }
+
+    public function getStatus(): BuildingStatus
+    {
+        return $this->status;
+    }
+
+    public function setStatus(BuildingStatus $status): static
+    {
+        $this->status = $status;
+
         return $this;
     }
 }

@@ -3,7 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\PlayerInventory;
-use App\Entity\User;
+use App\Entity\Player;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -17,14 +17,33 @@ class PlayerInventoryRepository extends ServiceEntityRepository
         parent::__construct($registry, PlayerInventory::class);
     }
 
-    public function findByPlayer(User $user): array
+    public function findByPlayer(Player $player): array
     {
         return $this->createQueryBuilder('pi')
             ->join('pi.resourceType', 'rt')
             ->addSelect('rt')
             ->where('pi.player = :player')
-            ->setParameter('player', $user)
+            ->setParameter('player', $player)
             ->getQuery()
             ->getResult();
+    }
+
+    public function findIndexedByResource(Player $player): array
+    {
+        $inventories = $this->createQueryBuilder('pi')
+            ->join('pi.resourceType', 'rt')
+            ->addSelect('rt')
+            ->where('pi.player = :player')
+            ->setParameter('player', $player)
+            ->getQuery()
+            ->getResult();
+
+        $result = [];
+
+        foreach ($inventories as $inventory) {
+            $result[$inventory->getResourceType()->getCode()] = $inventory;
+        }
+
+        return $result;
     }
 }

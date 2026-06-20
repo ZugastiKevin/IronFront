@@ -3,10 +3,10 @@
 namespace App\Repository;
 
 use App\Entity\Building;
-use App\Entity\Game;
+use App\Entity\Player;
 use App\Entity\ResourceType;
-use App\Entity\User;
 use App\Enum\BuildingCategory;
+use App\Enum\BuildingCode;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -20,14 +20,26 @@ class BuildingRepository extends ServiceEntityRepository
         parent::__construct($registry, Building::class);
     }
 
+    public function findBaseForPlayer(Player $player): ?Building
+    {
+        return $this->createQueryBuilder('b')
+            ->join('b.buildingType', 'bt')
+            ->where('b.player = :player')
+            ->andWhere('bt.code = :code')
+            ->setParameter('player', $player)
+            ->setParameter('code', BuildingCode::BASE)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     /**
      * Récupère les données des bâtiments pour une partie.
-     * @param Game $game
+     * @param Player $player
      * @return array
      */
-    public function getBuildingsDataForGame(Game $game): array
+    public function getBuildingsDataForPlayer(Player $player): array
     {
-        $buildings = $this->findBy(['game' => $game]);
+        $buildings = $this->findBy(['player' => $player]);
         $buildingData = [];
 
         foreach ($buildings as $b) {
@@ -45,7 +57,7 @@ class BuildingRepository extends ServiceEntityRepository
                 'type' => $buildingType->getLabel(),
                 'code' => $buildingType->getCode(),
                 'level' => $level,
-                'ownerId' => $b->getUser()->getId(),
+                'ownerId' => $b->getPlayer()->getId(),
                 'production_rate' => $productionRate > 0 ? $production : null,
                 'production' => $production > 0 ? $production : null,
                 'resource_type' => $resourceType,
@@ -56,90 +68,18 @@ class BuildingRepository extends ServiceEntityRepository
     }
 
     /**
-     * @return array<string, float> Map du code ressource => taux de production par heure
-     */
-    public function getProductionRatesByResourceForUser(User $user): array
-    {
-        $rows = $this->createQueryBuilder('b')
-            ->select('rt.code AS resourceCode', 'SUM(COALESCE(b.level, 1) * COALESCE(bt.production_rate, 0)) AS productionRate')
-            ->join('b.buildingType', 'bt')
-            ->join('bt.resourceType', 'rt')
-            ->where('b.user = :user')
-            ->andWhere('bt.resourceType IS NOT NULL')
-            ->setParameter('user', $user)
-            ->groupBy('rt.code')
-            ->getQuery()
-            ->getArrayResult();
-
-        $rates = [];
-
-        foreach ($rows as $row) {
-            $resourceCode = $row['resourceCode'] ?? null;
-
-            if (!$resourceCode) {
-                continue;
-            }
-
-            $rates[$resourceCode] = (float) ($row['productionRate'] ?? 0);
-        }
-
-        return $rates;
-    }
-
-    public function findBaseForUser(Game $game, User $user): ?Building
-    {
-        return $this->createQueryBuilder('b')
-            ->join('b.buildingType', 'bt')
-            ->where('b.user = :user')
-            ->andWhere('b.game = :game')
-            ->andWhere('bt.name = :name')
-            ->setParameter('user', $user)
-            ->setParameter('game', $game)
-            ->setParameter('name', 'base')
-            ->getQuery()
-            ->getOneOrNullResult();
-    }
-
-    /**
-     * Trouve les bâtiments producteurs pouvant avoir une livraison
-     * - Bâtiments créés depuis plus de 1h
-     * - Bâtiments sans livraison, ou avec livraison terminée
-     */
-    public function getProducerBuildingsWithoutDelivery(User $user, Game $game): array
-    {
-        $now = new \DateTimeImmutable();
-        $oneHourAgo = $now->modify('-1 hour');
-
-        return $this->createQueryBuilder('b')
-            ->join('b.buildingType', 'bt')
-            ->where('b.user = :user')
-            ->andWhere('b.game = :game')
-            ->andWhere('bt.category = :category')
-            ->setParameter('category', BuildingCategory::PRODUCTION)
-            ->andWhere('b.createdAt IS NOT NULL AND b.createdAt <= :oneHourAgo')
-            ->leftJoin('b.deliveries', 'd')
-            ->andWhere('d.id IS NULL OR d.status = :deliveredStatus')
-            ->setParameter('user', $user)
-            ->setParameter('game', $game)
-            ->setParameter('oneHourAgo', $oneHourAgo)
-            ->setParameter('deliveredStatus', \App\Entity\ResourceDelivery::STATUS_DELIVERED)
-            ->getQuery()
-            ->getResult();
-    }
-
-    /**
      * Trouve les types de bâtiments qui produisent une ressource donnée
      */
-    public function findProductionBuildingsByResource(Game $game, ResourceType $resourceType): array
+    public function findProductionBuildingsByResource(Player $player, ResourceType $resourceType): array
     {
         return $this->createQueryBuilder('b')
             ->join('b.buildingType', 'bt')
             ->where('bt.resourceType = :resourceType')
             ->andWhere('bt.category = :category')
             ->setParameter('category', BuildingCategory::PRODUCTION)
-            ->andWhere('b.game = :game')
+            ->andWhere('b.player = :player')
             ->setParameter('resourceType', $resourceType)
-            ->setParameter('game', $game)
+            ->setParameter('player', $player)
             ->getQuery()
             ->getResult();
     }
@@ -148,17 +88,15 @@ class BuildingRepository extends ServiceEntityRepository
      * Retourne tous les bâtiments producteurs d'un joueur
      * (peu importe l'état des livraisons — le handler gère la logique)
      */
-    public function getProducerBuildings(Game $game, User $user): array
+    public function getProducerBuildings(Player $player): array
     {
         return $this->createQueryBuilder('b')
             ->join('b.buildingType', 'bt')
-            ->where('b.user = :user')
-            ->andWhere('b.game = :game')
+            ->where('b.player = :player')
             ->andWhere('bt.category = :category')
             ->andWhere('bt.resourceType IS NOT NULL')
             ->andWhere('b.createdAt IS NOT NULL')
-            ->setParameter('user', $user)
-            ->setParameter('game', $game)
+            ->setParameter('player', $player)
             ->setParameter('category', BuildingCategory::PRODUCTION)
             ->getQuery()
             ->getResult();

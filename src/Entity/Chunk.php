@@ -52,7 +52,7 @@ class Chunk
         return $this->chunkId;
     }
 
-    public function setChunkId(string $chunkId): self
+    public function setChunkId(string $chunkId): static
     {
         $this->chunkId = $chunkId;
         return $this;
@@ -63,7 +63,7 @@ class Chunk
         return $this->updatedAt;
     }
 
-    public function setUpdatedAt(\DateTimeImmutable $updatedAt): self
+    public function setUpdatedAt(\DateTimeImmutable $updatedAt): static
     {
         $this->updatedAt = $updatedAt;
         return $this;
@@ -77,7 +77,7 @@ class Chunk
         return $this->roads;
     }
 
-    public function addRoad(Road $road): self
+    public function addRoad(Road $road): static
     {
         if (!$this->roads->contains($road)) {
             $this->roads->add($road);
@@ -87,7 +87,7 @@ class Chunk
         return $this;
     }
 
-    public function removeRoad(Road $road): self
+    public function removeRoad(Road $road): static
     {
         if ($this->roads->removeElement($road)) {
             // set the owning side to null (unless already changed)
@@ -107,7 +107,7 @@ class Chunk
         return $this->buildings;
     }
 
-    public function addBuilding(Building $building): self
+    public function addBuilding(Building $building): static
     {
         if (!$this->buildings->contains($building)) {
             $this->buildings->add($building);
@@ -117,7 +117,7 @@ class Chunk
         return $this;
     }
 
-    public function removeBuilding(Building $building): self
+    public function removeBuilding(Building $building): static
     {
         if ($this->buildings->removeElement($building)) {
             // set the owning side to null (unless already changed)

@@ -16,7 +16,7 @@ class Game
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(length: 191)]
     private ?string $label = null;
 
     #[ORM\Column]
@@ -32,30 +32,21 @@ class Game
     private ?bool $isActive = null;
 
     /**
-     * @var Collection<int, User>
+     * @var Collection<int, Player>
      */
-    #[ORM\OneToMany(targetEntity: User::class, mappedBy: 'game')]
-    private Collection $users;
+    #[ORM\OneToMany(targetEntity: Player::class, mappedBy: 'game')]
+    private Collection $players;
 
+    /**
+     * @var Collection<int, GameResourceDeposit>
+     */
     #[ORM\OneToMany(targetEntity: GameResourceDeposit::class, mappedBy: 'game', orphanRemoval: true)]
     private Collection $gameResourceDeposits;
 
-    #[ORM\OneToMany(mappedBy: 'game', targetEntity: Delivery::class, orphanRemoval: true)]
-    private Collection $Deliveries;
-
-    #[ORM\OneToMany(mappedBy: 'game', targetEntity: Building::class, orphanRemoval: true)]
-    private Collection $buildings;
-
-    #[ORM\OneToMany(mappedBy: 'game', targetEntity: PlayerInventory::class, orphanRemoval: true)]
-    private Collection $playerInventories;
-
     public function __construct()
     {
-        $this->users = new ArrayCollection();
+        $this->players = new ArrayCollection();
         $this->gameResourceDeposits = new ArrayCollection();
-        $this->Deliveries = new ArrayCollection();
-        $this->buildings = new ArrayCollection();
-        $this->playerInventories = new ArrayCollection();
     }
 
     public function __toString(): string
@@ -129,30 +120,18 @@ class Game
     }
 
     /**
-     * @return Collection<int, User>
+     * @return Collection<int, Player>
      */
-    public function getUsers(): Collection
+    public function getPlayers(): Collection
     {
-        return $this->users;
+        return $this->players;
     }
 
-    public function addUser(User $user): static
+    public function addPlayer(Player $player): static
     {
-        if (!$this->users->contains($user)) {
-            $this->users->add($user);
-            $user->setGame($this);
-        }
-
-        return $this;
-    }
-
-    public function removeUser(User $user): static
-    {
-        if ($this->users->removeElement($user)) {
-            // set the owning side to null (unless already changed)
-            if ($user->getGame() === $this) {
-                $user->setGame(null);
-            }
+        if (!$this->players->contains($player)) {
+            $this->players->add($player);
+            $player->setGame($this);
         }
 
         return $this;
@@ -185,71 +164,5 @@ class Game
         }
 
         return $this;
-    }
-
-    /**
-     * @return Collection<int, Delivery>
-     */
-    public function getDeliveries(): Collection
-    {
-        return $this->Deliveries;
-    }
-
-    public function addDelivery(Delivery $delivery): static
-    {
-        if (!$this->Deliveries->contains($delivery)) {
-            $this->Deliveries->add($delivery);
-            $delivery->setGame($this);
-        }
-
-        return $this;
-    }
-
-    public function removeDelivery(Delivery $delivery): static
-    {
-        if ($this->Deliveries->removeElement($delivery)) {
-            if ($delivery->getGame() === $this) {
-                $delivery->setGame(null);
-            }
-        }
-
-        return $this;
-    }
-
-    /**
-     * @return Collection<int, Building>
-     */
-    public function getBuildings(): Collection
-    {
-        return $this->buildings;
-    }
-
-    public function addBuilding(Building $building): static
-    {
-        if (!$this->buildings->contains($building)) {
-            $this->buildings->add($building);
-            $building->setGame($this);
-        }
-
-        return $this;
-    }
-
-    public function removeBuilding(Building $building): static
-    {
-        if ($this->buildings->removeElement($building)) {
-            if ($building->getGame() === $this) {
-                $building->setGame(null);
-            }
-        }
-
-        return $this;
-    }
-
-    /**
-     * @return Collection<int, PlayerInventory>
-     */
-    public function getPlayerInventories(): Collection
-    {
-        return $this->playerInventories;
     }
 }

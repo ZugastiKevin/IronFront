@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\ResourceCode;
 use App\Repository\ResourceTypeRepository;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -16,8 +17,8 @@ class ResourceType
     #[ORM\Column(length: 100)]
     private ?string $label = null;
 
-    #[ORM\Column(length: 50, unique: true)]
-    private ?string $code = null;
+    #[ORM\Column(type: 'string',length: 191, enumType: ResourceCode::class)]
+    private ResourceCode $code;
 
     #[ORM\Column(length: 7)]
     private ?string $color = null;
@@ -30,12 +31,12 @@ class ResourceType
         return $this->id;
     }
 
-    public function getCode(): ?string
+    public function getCode(): ?ResourceCode
     { 
         return $this->code;
     }
 
-    public function setCode(string $code): self
+    public function setCode(ResourceCode $code): static
     { 
         $this->code = $code; return $this;
     }
@@ -45,7 +46,7 @@ class ResourceType
         return $this->label;
     }
 
-    public function setLabel(string $label): self
+    public function setLabel(string $label): static
     {
         $this->label = $label; return $this;
     }
@@ -55,7 +56,7 @@ class ResourceType
         return $this->color;
     }
 
-    public function setColor(?string $color): self
+    public function setColor(?string $color): static
     {
         $this->color = $color;
         return $this;
@@ -71,7 +72,7 @@ class ResourceType
         return $this->rarity;
     }
 
-    public function setRarity(int $rarity): self
+    public function setRarity(int $rarity): static
     {
         $this->rarity = $rarity;
         return $this;

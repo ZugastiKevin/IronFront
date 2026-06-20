@@ -16,20 +16,10 @@ class FactionRepository extends ServiceEntityRepository
         parent::__construct($registry, Faction::class);
     }
 
-    public function findOrderedByName(): array
+    public function findOneByCode(string $code): ?Faction
     {
-        return $this->createQueryBuilder('f')
-            ->orderBy('f.name', 'ASC')
-            ->getQuery()
-            ->getResult();
-    }
-
-    public function findByCode(string $code): ?Faction
-    {
-        return $this->createQueryBuilder('f')
-            ->where('f.code = :code')
-            ->setParameter('code', $code)
-            ->getQuery()
-            ->getOneOrNullResult();
+        return $this->findOneBy([
+            'code' => $code
+        ]);
     }
 }

@@ -2,30 +2,26 @@
 
 namespace App\Entity;
 
+use App\Enum\DeliveryStatus;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\HasLifecycleCallbacks]
 #[ORM\Table]
-#[ORM\Index(name: 'idx_game_status', columns: ['game_id', 'status'])]
-#[ORM\Index(name: 'idx_game_scheduled_at', columns: ['game_id', 'scheduled_at'])]
-#[ORM\Index(name: 'idx_game_created_at', columns: ['game_id', 'created_at'])]
+#[ORM\Index(name: 'idx_player_status', columns: ['player_id', 'status'])]
+#[ORM\Index(name: 'idx_player_scheduled_at', columns: ['player_id', 'scheduled_at'])]
+#[ORM\Index(name: 'idx_player_created_at', columns: ['player_id', 'created_at'])]
 class Delivery
 {
-    public const STATUS_WAITING = 'waiting';
-    public const STATUS_PENDING = 'pending';
-    public const STATUS_IN_TRANSIT = 'in_transit';
-    public const STATUS_DELIVERED = 'delivered';
-
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\ManyToOne(targetEntity: Player::class, inversedBy: 'deliveries')]
     #[ORM\JoinColumn(nullable: false)]
-    private ?User $user = null;
+    private ?Player $player = null;
 
     #[ORM\ManyToOne(targetEntity: ResourceType::class)]
     #[ORM\JoinColumn(nullable: false)]
@@ -34,16 +30,16 @@ class Delivery
     #[ORM\Column]
     private int $quantity = 0;
 
-    #[ORM\ManyToOne(targetEntity: Building::class, inversedBy: 'deliveries')]
+    #[ORM\ManyToOne(inversedBy: 'deliveries')]
     #[ORM\JoinColumn(nullable: false)]
     private ?Building $sourceBuilding = null;
 
-    #[ORM\ManyToOne(targetEntity: Building::class)]
+    #[ORM\ManyToOne(inversedBy: 'incomingDeliveries')]
     #[ORM\JoinColumn(nullable: false)]
     private ?Building $targetBuilding = null;
 
-    #[ORM\Column(length: 20)]
-    private string $status = self::STATUS_WAITING;
+    #[ORM\Column(type: 'string',length: 191, enumType: DeliveryStatus::class)]
+    private DeliveryStatus $status = DeliveryStatus::WAITING;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private ?\DateTimeImmutable $createdAt = null;
@@ -63,10 +59,6 @@ class Delivery
     #[ORM\Column(type: Types::INTEGER)]
     private int $estimatedTime = 0;
 
-    #[ORM\ManyToOne(targetEntity: Game::class, inversedBy: 'Deliveries')]
-    #[ORM\JoinColumn(nullable: false)]
-    private ?Game $game = null;
-
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
@@ -85,14 +77,14 @@ class Delivery
         return $this->id;
     }
 
-    public function getUser(): ?User
+    public function getPlayer(): ?Player
     {
-        return $this->user;
+        return $this->player;
     }
 
-    public function setUser(?User $user): static
+    public function setPlayer(?Player $player): static
     {
-        $this->user = $user;
+        $this->player = $player;
         return $this;
     }
 
@@ -140,12 +132,12 @@ class Delivery
         return $this;
     }
 
-    public function getStatus(): string
+    public function getStatus(): DeliveryStatus
     {
         return $this->status;
     }
 
-    public function setStatus(string $status): static
+    public function setStatus(DeliveryStatus $status): static
     {
         $this->status = $status;
         return $this;
@@ -208,17 +200,17 @@ class Delivery
 
     public function isDelivered(): bool
     {
-        return $this->status === self::STATUS_DELIVERED;
+        return $this->status === DeliveryStatus::DELIVERED;
     }
 
     public function isWaiting(): bool
     {
-        return $this->status === self::STATUS_WAITING;
+        return $this->status === DeliveryStatus::WAITING;
     }
 
     public function startDelivery(): void
     {
-        $this->status = self::STATUS_IN_TRANSIT;
+        $this->status = DeliveryStatus::IN_TRANSIT;
         $this->progress = 0;
     }
 
@@ -252,17 +244,5 @@ class Delivery
             'waypoints' => $this->waypoints,
             'progress' => $this->progress,
         ];
-    }
-
-    public function getGame(): ?Game
-    {
-        return $this->game;
-    }
-
-    public function setGame(?Game $game): static
-    {
-        $this->game = $game;
-
-        return $this;
     }
 }

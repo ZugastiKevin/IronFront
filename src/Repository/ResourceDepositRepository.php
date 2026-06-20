@@ -3,7 +3,6 @@
 namespace App\Repository;
 
 use App\Entity\Game;
-use App\Entity\GameResourceDeposit;
 use App\Entity\ResourceDeposit;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -18,16 +17,10 @@ class ResourceDepositRepository extends ServiceEntityRepository
         parent::__construct($registry, ResourceDeposit::class);
     }
 
-    public function findNearestAvailable(Game $game, float $lat, float $lng, float $radius = 0.005): ?ResourceDeposit
-    {
+    public function findNearestAvailable(Game $game, float $lat, float $lng, float $radius = 0.005): ?ResourceDeposit {
         return $this->createQueryBuilder('r')
-            ->leftJoin(
-                GameResourceDeposit::class,
-                'grd',
-                'WITH',
-                'grd.resourceDeposit = r.id AND grd.game = :game'
-            )
-            ->where('grd.isClaimed IS NULL OR grd.isClaimed = false')
+            ->leftJoin('r.gameResourceDeposits', 'grd', 'WITH', 'grd.game = :game')
+            ->where('grd.id IS NULL OR grd.isClaimed = false')
             ->andWhere('ABS(r.latitude - :lat) < :radius')
             ->andWhere('ABS(r.longitude - :lng) < :radius')
             ->setParameter('game', $game)
@@ -48,16 +41,5 @@ class ResourceDepositRepository extends ServiceEntityRepository
             ->setParameter('chunkId', $chunkId)
             ->getQuery()
             ->getResult();
-    }
-
-    public function findByChunkIdSafe(string $chunkId): array
-    {
-        try {
-            return $this->findByChunkId($chunkId);
-        } catch (\Exception $e) {
-            // Log l'erreur et retourne un tableau vide
-            error_log('ResourceDeposit findByChunkId error: ' . $e->getMessage());
-            return [];
-        }
     }
 }

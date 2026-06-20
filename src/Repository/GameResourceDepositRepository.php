@@ -15,16 +15,16 @@ class GameResourceDepositRepository extends ServiceEntityRepository
         parent::__construct($registry, GameResourceDeposit::class);
     }
 
-    public function isClaimed(Game $game, ResourceDeposit $deposit): bool
+    public function isCaptured(Game $game, ResourceDeposit $deposit): bool
     {
-        return $this->createQueryBuilder('g')
+        return (bool) $this->createQueryBuilder('g')
             ->select('COUNT(g.id)')
             ->where('g.game = :game')
             ->andWhere('g.resourceDeposit = :deposit')
-            ->andWhere('g.isClaimed = true')
+            ->andWhere('g.isCaptured = true')
             ->setParameter('game', $game)
             ->setParameter('deposit', $deposit)
             ->getQuery()
-            ->getSingleScalarResult() > 0;
+            ->getSingleScalarResult();
     }
 }
