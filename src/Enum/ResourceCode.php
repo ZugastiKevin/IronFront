@@ -21,7 +21,7 @@ enum ResourceCode: string
         return match ($this) {
             self::IRON => "Minerai de fer",
             self::IRON_INGOT => "L'ingot de fer",
-            self::OIL => "Pétrole",
+            self::OIL => "Pétrole brut",
             self::REFINED_OIL => "Pétrole raffiné",
             self::GASOLINE => "Essence",
             self::LATEX => "Latex",
