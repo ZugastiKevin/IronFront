@@ -29,3 +29,28 @@
         {% block body %}{% endblock %}
     </body>
 </html>
+
+<script>
+    window.appTranslations = {
+        pseudo_required: {{ 'form.error.pseudo_required'|trans|json_encode|raw }},
+        pseudo_min_3: {{ 'form.error.pseudo_min'|trans({'%limit%': 3})|json_encode|raw }},
+        pseudo_max_25: {{ 'form.error.pseudo_max'|trans({'%limit%': 25})|json_encode|raw }},
+        email_required: {{ 'form.error.error_email_required'|trans|json_encode|raw }},
+        email_invalid: {{ 'form.error.error_email'|trans|json_encode|raw }},
+
+        password_required: {{ 'form.error.password_required'|trans|json_encode|raw }},
+        password_confirm_required: {{ 'form.error.password_confirm_required'|trans|json_encode|raw }},
+        password_mismatch: {{ 'form.error.error_mismatch'|trans|json_encode|raw }},
+        password_length_8: {{ 'form.error.error_password_length'|trans({'%limit%': 8})|json_encode|raw }},
+        password_upper: {{ 'form.error.error_upper'|trans|json_encode|raw }},
+        password_number: {{ 'form.error.error_number'|trans|json_encode|raw }},
+        password_special: {{ 'form.error.error_special'|trans|json_encode|raw }},
+
+        support_category_required: {{ 'form.error.support_category_required'|trans|json_encode|raw }},
+        support_message_required: {{ 'form.error.support_message_required'|trans|json_encode|raw }},
+        support_message_min_10: {{ 'form.error.support_message_min'|trans({'%limit%': 10})|json_encode|raw }},
+
+        image_type: {{ 'form.error.image_type'|trans|json_encode|raw }},
+        image_size: {{ 'form.error.image_size'|trans|json_encode|raw }}
+    };
+</script>

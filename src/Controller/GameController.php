@@ -58,7 +58,7 @@ final class GameController extends AbstractController
             if ($selectedFaction === null) {
                 $form->get('faction')->addError(new FormError('Veuillez sélectionner une faction.'));
 
-                $activeGames = $gameRepository->findBy(['is_active' => true]);
+                $activeGames = $gameRepository->findBy(['isActive' => true]);
 
                 return $this->render('game/choose_faction.html.twig', [
                     'form' => $form->createView(),
@@ -84,7 +84,7 @@ final class GameController extends AbstractController
         }
 
         // Parties actives disponibles, et games sur lesquelles l'utilisateur a déjà un player
-        $activeGames = $gameRepository->findBy(['is_active' => true]);
+        $activeGames = $gameRepository->findBy(['isActive' => true]);
 
         return $this->render('game/choose_faction.html.twig', [
             'form' => $form->createView(),

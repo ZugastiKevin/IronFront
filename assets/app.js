@@ -7,3 +7,11 @@ import '@fortawesome/fontawesome-free/js/all.js';
  * which should already be in your base.html.twig.
  */
 import './styles/app.scss';
+
+import './scripts/security/form.js';
+import './scripts/security/remember_me.js';
+import './scripts/security/reset-btn.js';
+
+
+// Game-specific scripts (only loaded on game pages)
+import './scripts/Game/utils/faction-game-choice.js';

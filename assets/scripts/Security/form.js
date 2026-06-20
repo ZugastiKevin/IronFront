@@ -65,6 +65,18 @@ function registerValidator(inputId, errorId, validateFn) {
     validators[inputId] = { errorId, validateFn };
 }
 
+// - true                -> pas d'erreur
+// - string               -> message unique (comportement existant)
+// - string[]              -> liste à puces, une ligne par règle non respectée
+function buildErrorMarkup(result) {
+    if (Array.isArray(result)) {
+        if (result.length === 0) return '';
+        const items = result.map(line => `<li>${line}</li>`).join('');
+        return `<ul class="form-error-list">${items}</ul>`;
+    }
+    return result;
+}
+
 function runValidator(inputId) {
     const config = validators[inputId];
     if (!config) return true;
@@ -82,8 +94,10 @@ function runValidator(inputId) {
 
     const result = config.validateFn(input.value, input);
 
-    if (result !== true) {
-        errorBox.textContent = result;
+    const isValid = result === true || (Array.isArray(result) && result.length === 0);
+ 
+    if (!isValid) {
+        errorBox.innerHTML = buildErrorMarkup(result);
         errorBox.style.visibility = 'visible';
         wrapper?.classList.add('inputs--invalid');
         return false;
@@ -150,6 +164,31 @@ function attachValidator(inputId, eventTypes = ['input', 'blur'], delayMs = 3000
 }
 
 // =====================================================
+// VALIDATEURS PSEUDOS (génériques)
+// =====================================================
+
+function t(key) {
+    return (window.appTranslations && window.appTranslations[key]) || key;
+}
+
+function registerPseudo(inputId, errorId, minLength = 3, maxLength = 25) {
+    registerValidator(inputId, errorId, (value) => {
+        const v = value.trim();
+        if (v === "") return t('pseudo_required');
+        if (v.length < minLength) return t('pseudo_min_3');
+        if (v.length > maxLength) return t('pseudo_max_25');
+        return true;
+    });
+}
+
+const pseudoFields = [
+    { inputId: "support_name", errorId: "pseudo-error", minLength: 3, maxLength: 25 },
+    { inputId: "user_pseudo", errorId: "user_pseudo-error", minLength: 3, maxLength: 25 },
+];
+
+pseudoFields.forEach(f => registerPseudo(f.inputId, f.errorId, f.minLength, f.maxLength));
+
+// =====================================================
 // VALIDATEURS EMAILS (génériques pour tout le site)
 // =====================================================
 
@@ -172,41 +211,23 @@ const emailFields = [
 emailFields.forEach(f => registerEmail(f.inputId, f.errorId));
 
 // =====================================================
-// VALIDATEURS PSEUDOS (génériques)
-// =====================================================
-
-function t(key) {
-    return (window.appTranslations && window.appTranslations[key]) || key;
-}
-
-function registerPseudo(inputId, errorId, minLength = 3) {
-    registerValidator(inputId, errorId, (value) => {
-        const v = value.trim();
-        if (v === "") return t('pseudo_required');
-        if (v.length < minLength) return t('pseudo_min_3');
-        return true;
-    });
-}
-
-const pseudoFields = [
-    { inputId: "support_name", errorId: "pseudo-error", minLength: 3 },
-    { inputId: "user_pseudo", errorId: "user_pseudo-error", minLength: 3 },
-];
-
-pseudoFields.forEach(f => registerPseudo(f.inputId, f.errorId, f.minLength));
-
-// =====================================================
 // VALIDATEURS MOTS DE PASSE (génériques)
 // =====================================================
 
+function passwordChecklist(value) {
+    const v = value;
+    const errors = [];
+ 
+    if (v.length < 8) errors.push(t('password_length_8'));
+    if (!/[A-Z]/.test(v)) errors.push(t('password_upper'));
+    if (!/\d/.test(v)) errors.push(t('password_number'));
+    if (!/[\W_]/.test(v)) errors.push(t('password_special'));
+ 
+    return errors;
+}
+
 registerValidator("user_plainPassword_first", "user_password_first-error", (value) => {
-    const v = value.trim();
-    if (v === "") return t('password_required');
-    if (v.length < 8) return t('password_length_8');
-    if (!/[A-Z]/.test(v)) return t('password_upper');
-    if (!/\d/.test(v)) return t('password_number');
-    if (!/[\W_]/.test(v)) return t('password_special');
-    return true;
+    return passwordChecklist(value);
 });
 
 registerValidator("user_plainPassword_second", "user_password_second-error", (value) => {
@@ -219,13 +240,7 @@ registerValidator("user_plainPassword_second", "user_password_second-error", (va
 });
 
 registerValidator("reset_password_form_plainPassword_first", "reset_password_form_plainPassword_first-error", (value) => {
-    const v = value.trim();
-    if (v === "") return t('password_required');
-    if (v.length < 8) return t('password_length_8');
-    if (!/[A-Z]/.test(v)) return t('password_upper');
-    if (!/\d/.test(v)) return t('password_number');
-    if (!/[\W_]/.test(v)) return t('password_special');
-    return true;
+    return passwordChecklist(value);
 });
 
 registerValidator("reset_password_form_plainPassword_second", "reset_password_form_plainPassword_second-error", (value) => {
