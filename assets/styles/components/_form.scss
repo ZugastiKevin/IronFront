@@ -354,6 +354,7 @@
     #form {
         padding: 0;
         .form {
+            height: calc(100vh - 70px);
             @include form-basique($height: 100%);
 
             .form-content {
@@ -361,6 +362,7 @@
                 padding-bottom: 0;
 
                 .all-form {
+                    padding: 5% 5% 0% 5%;
                     @include input-label-effect($margin-bottom: 0.8rem);
                 }
             }

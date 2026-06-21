@@ -16,16 +16,20 @@
                     </li> #}
 
                     {# Affichage des ressources du joueur connecté - uniquement sur la page de jeu #}
-                    {% if app.user and app.user.playerInventories is not empty and currentRoute == 'game' %}
+                    {% if app.user and currentRoute == 'game' %}
                         <li class="resources-display">
                             <div class="resources-list">
-                                {% for inventory in app.user.playerInventories %}
-                                    <span class="resource-item" title="{{ inventory.resourceType.label }}" data-resource-code="{{ inventory.resourceType.code }}">
-                                        <img src="{{ asset('assets/images/resources/' ~ inventory.resourceType.code ~ '.png') }}"
-                                             alt="{{ inventory.resourceType.label }}"
-                                             class="resource-icon">
-                                        <span class="resource-qty">{{ inventory.quantity }}</span>
-                                    </span>
+                                {% for player in app.user.players %}
+                                    {% for inventory in player.playerInventories %}
+                                        <span class="resource-item"
+                                            title="{{ inventory.resourceType.label }}"
+                                            data-resource-code="{{ inventory.resourceType.code }}">
+                                            <img src="{{ asset('assets/images/resources/' ~ inventory.resourceType.code ~ '.png') }}"
+                                                alt="{{ inventory.resourceType.label }}"
+                                                class="resource-icon">
+                                            <span class="resource-qty">{{ inventory.quantity }}</span>
+                                        </span>
+                                    {% endfor %}
                                 {% endfor %}
                             </div>
                         </li>
