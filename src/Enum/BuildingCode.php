@@ -17,6 +17,8 @@ enum BuildingCode: string
     case FACTORY_RUBBER = "factory_rubber";
     case BAUXITE_QUARRY = "bauxite_quarry";
     case RARE_EARTH_MINE = "rare_earth_mine";
+    case FACTORY_ALUMINUM_ALLOY = "factory_aluminum_alloy";
+    case FACTORY_CIRCUIT_BOARD = "factory_circuit_board";
     
     
 
@@ -36,6 +38,8 @@ enum BuildingCode: string
             self::FACTORY_RUBBER => "Usine de caoutchouc",
             self::BAUXITE_QUARRY => "Carrière de bauxite",
             self::RARE_EARTH_MINE => "Mine de terres rares",
+            self::FACTORY_ALUMINUM_ALLOY => "Usine d'alliage d'aluminium",
+            self::FACTORY_CIRCUIT_BOARD => "Usine de circuits imprimés",
         };
     }
 }

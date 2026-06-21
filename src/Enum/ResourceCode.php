@@ -13,6 +13,8 @@ enum ResourceCode: string
     case RUBBER = "rubber";
     case BAUXITE = "bauxite";
     case RARE_EARTH = "rare_earth";
+    case ALUMINUM_ALLOY = "aluminum_alloy";
+    case CIRCUIT_BOARD = "circuit_board";
     
     
 
@@ -28,6 +30,8 @@ enum ResourceCode: string
             self::RUBBER => "Caoutchouc",
             self::BAUXITE => "Bauxite",
             self::RARE_EARTH => "Terres rares",
+            self::ALUMINUM_ALLOY => "Alliage d'aluminium",
+            self::CIRCUIT_BOARD => "Circuit imprimé",
         };
     }
 }

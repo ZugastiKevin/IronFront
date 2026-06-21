@@ -11,4 +11,5 @@ enum BuildingCategory: string
     case DEFENSE = 'defense';
     case RESEARCH = 'research';
     case TRADE = 'trade';
+    case INFRASTRUCTURE = 'infrastructure';
 }
