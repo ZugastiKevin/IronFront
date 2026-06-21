@@ -8,6 +8,8 @@ import '@fortawesome/fontawesome-free/js/all.js';
  */
 import './styles/app.scss';
 
+import './scripts/Layout/dropdown.js';
+import './scripts/Layout/switch_layout.js';
 import './scripts/security/form.js';
 import './scripts/security/remember_me.js';
 import './scripts/security/reset-btn.js';
