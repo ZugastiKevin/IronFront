@@ -28,11 +28,11 @@ class BuildingType
     #[ORM\Column]
     private ?float $production_rate = null;
 
-    #[ORM\ManyToOne(targetEntity: ResourceType::class)]
-    private ?ResourceType $resourceType = null;
-
     #[ORM\Column]
     private ?int $max_level = null;
+
+    #[ORM\ManyToOne(targetEntity: ResourceType::class)]
+    private ?ResourceType $resourceType = null;
 
     /**
      * @var Collection<int, Building>
