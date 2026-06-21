@@ -126,14 +126,14 @@
     }
 }
 
-@mixin input-label-effect() {
+@mixin input-label-effect($margin-bottom: 1.15rem) {
     span:first-child {
         padding-top: 5%;
     }
     span {
         width: 100%;
         display: block;
-        margin-bottom: 1.15rem;
+        margin-bottom: $margin-bottom;
         position: relative;
         text-shadow: 1px 1px 0 black, -1px -1px 0 black, 1px -1px 0 black, -1px  1px 0 black;
 
@@ -346,6 +346,24 @@
     #form {
         .form {
             width: 35%;
+        }
+    }
+}
+
+@media screen and (max-width:1820px) {
+    #form {
+        padding: 0;
+        .form {
+            @include form-basique($height: 100%);
+
+            .form-content {
+                gap: 1rem;
+                padding-bottom: 0;
+
+                .all-form {
+                    @include input-label-effect($margin-bottom: 0.8rem);
+                }
+            }
         }
     }
 }
