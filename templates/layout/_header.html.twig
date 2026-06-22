@@ -22,10 +22,10 @@
                                 {% for player in app.user.players %}
                                     {% for inventory in player.playerInventories %}
                                         <span class="resource-item"
-                                            title="{{ inventory.resourceType.label }}"
-                                            data-resource-code="{{ inventory.resourceType.code }}">
-                                            <img src="{{ asset('assets/images/resources/' ~ inventory.resourceType.code ~ '.png') }}"
-                                                alt="{{ inventory.resourceType.label }}"
+                                            title="{{ inventory.resourceType.code.label }}"
+                                            data-resource-code="{{ inventory.resourceType.code.value }}">
+                                            <img src="{{ asset('assets/images/resources/' ~ inventory.resourceType.code.value ~ '.png') }}"
+                                                alt="{{ inventory.resourceType.code.label }}"
                                                 class="resource-icon">
                                             <span class="resource-qty">{{ inventory.quantity }}</span>
                                         </span>
