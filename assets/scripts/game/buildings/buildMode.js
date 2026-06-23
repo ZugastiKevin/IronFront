@@ -112,6 +112,11 @@ async function onMapClick(e) {
             map.removeLayer(previewBuildingMarker);
             previewBuildingMarker = null;
             clearBuildingSelection();
+
+            // Rafraîchir la sidebar si nécessaire
+            if (data.refreshSidebar) {
+                refreshSidebar();
+            }
         } else {
             debugError('buildings', `Erreur: ${data.error}`);
         }
@@ -166,4 +171,26 @@ export function deactivateBuildMode() {
  */
 export function isBuildModeActive() {
     return selectedBuildingType !== null;
+}
+
+/**
+ * Rafraîchit le contenu de la sidebar
+ */
+export async function refreshSidebar() {
+    try {
+        const response = await fetch('/sidebar');
+        if (response.ok) {
+            const html = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const newSidebar = doc.querySelector('#sideBar');
+
+            if (newSidebar) {
+                document.querySelector('#sideBar')?.replaceWith(newSidebar);
+                showNotification('Sidebar actualisée', 'info');
+            }
+        }
+    } catch (e) {
+        debugError('buildings', "Erreur lors du rafraîchissement de la sidebar", e);
+    }
 }

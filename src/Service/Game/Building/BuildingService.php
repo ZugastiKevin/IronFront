@@ -75,7 +75,7 @@ class BuildingService
     public function getResourceQuantity(Player $player, string $resourceCode): int
     {
         foreach ($player->getPlayerInventories() as $inventory) {
-            if ($inventory->getResourceType()->getCode() === $resourceCode) {
+            if ($inventory->getResourceType()->getCode()->value === $resourceCode) {
                 return $inventory->getQuantity();
             }
         }

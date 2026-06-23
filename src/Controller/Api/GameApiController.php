@@ -4,6 +4,7 @@ namespace App\Controller\Api;
 
 use App\Entity\Building;
 use App\Entity\BuildingType;
+use App\Entity\Delivery;
 use App\Entity\Game;
 use App\Entity\GameResourceDeposit;
 use App\Entity\Player;
@@ -288,7 +289,15 @@ final class GameApiController extends AbstractController
         $cacheKey = self::CACHE_VERSION . '_chunk_' . str_replace(['{', '}', '(', ')', '/', '\\', '@', ':'], '_', $chunk->getChunkId());
         $gameCache->delete($cacheKey);
 
-        return $this->json(['status' => 'ok', 'chunkId' => $chunk->getChunkId()]);
+        return $this->json([
+            'status' => 'ok',
+            'chunkId' => $chunk->getChunkId(),
+            'refreshSidebar' => true,
+            'baseCoords' => [
+                'lat' => $lat,
+                'lng' => $lng,
+            ],
+        ]);
     }
 
     // -------------------------
@@ -389,7 +398,7 @@ final class GameApiController extends AbstractController
             'base_costs' => $this->buildingService->getBuildCosts($bt, 1),
             'production_rate' => $bt->getProductionRate(),
             'max_level' => $bt->getMaxLevel(),
-            'resource_type' => $bt->getResourceType()?->getCode(),
+            'resource_type' => $bt->getResourceType()?->getCode()?->value,
         ], $types));
     }
 
@@ -414,8 +423,8 @@ final class GameApiController extends AbstractController
 
         return $this->json(array_map(fn($d) => [
             'id' => $d->getId(),
-            'type' => $d->getResourceType()->getCode(),
-            'label' => $d->getResourceType()->getLabel(),
+            'resource_type'  => $d->getResourceType()->getCode()->value,
+            'resource_label' => $d->getResourceType()->getLabel(),
             'costs' => $this->getExtractorCosts($d->getResourceType()),
             'richness' => $d->getRichness(),
             'latitude' => $d->getLatitude(),
@@ -425,7 +434,7 @@ final class GameApiController extends AbstractController
     }
 
     #[Route('/api/deposit/{id}/popup-content', methods: ['GET'])]
-    public function getDepositPopup(CurrentPlayer $currentPlayer, ResourceDeposit $deposit): Response
+    public function getDepositPopup(CurrentPlayer $currentPlayer, ResourceDeposit $deposit, GameResourceDepositRepository $gameDepositRepo): Response
     {
         $player = $currentPlayer->get();
 
@@ -433,10 +442,15 @@ final class GameApiController extends AbstractController
             throw $this->createAccessDeniedException();
         }
 
+        $game = $player->getGame();
+        if (!$game) {
+            throw $this->createAccessDeniedException();
+        }
+
         $extractorType = $this->buildingTypeRepo->createQueryBuilder('bt')
             ->where('bt.resourceType = :rt')
             ->andWhere('bt.production_rate > 0')
-            ->setParameter('rt', $deposit->getResourceType()->getId())
+            ->setParameter('rt', $deposit->getResourceType())
             ->getQuery()
             ->getOneOrNullResult();
 
@@ -444,16 +458,15 @@ final class GameApiController extends AbstractController
 
         // Calculer les ressources disponibles pour le joueur (tableau associatif code => quantity)
         $available = [];
-        if ($player) {
-            foreach ($costs as $item) {
-                $available[$item['code']] = $this->buildingService->getResourceQuantity($player, $item['code']);
-            }
+        foreach ($costs as $item) {
+            $available[$item['code']] = $this->buildingService->getResourceQuantity($player, $item['code']);
         }
 
-        return $this->render('game/_deposit_popup_content.html.twig', [
+        return $this->render('game/popup/_deposit_popup_content.html.twig', [
             'deposit' => $deposit,
             'costs' => $costs,
             'available' => $available,
+            'isClaimed' => $gameDepositRepo->isCaptured($game, $deposit),
         ]);
     }
 
@@ -466,7 +479,7 @@ final class GameApiController extends AbstractController
         $extractorType = $this->buildingTypeRepo->createQueryBuilder('bt')
             ->where('bt.resourceType = :rt')
             ->andWhere('bt.production_rate > 0')
-            ->setParameter('rt', $resourceType->getId())
+            ->setParameter('rt', $resourceType)
             ->getQuery()
             ->getOneOrNullResult();
 
@@ -499,7 +512,7 @@ final class GameApiController extends AbstractController
 
                 $result[$chunkId] = array_map(fn($d) => [
                     'id'             => $d->getId(),
-                    'resource_type'  => $d->getResourceType()?->getCode() ?? 'unknown',
+                    'resource_type' => $d->getResourceType()?->getCode()?->value ?? 'unknown',
                     'resource_label' => $d->getResourceType()?->getLabel() ?? 'unknown',
                     'costs'          => $this->getExtractorCosts($d->getResourceType()),
                     'richness'       => $d->getRichness(),
@@ -579,7 +592,9 @@ final class GameApiController extends AbstractController
         $upgradeInfo = $this->buildingService->getUpgradeInfo($building);
         $timeRemaining = $deliveryRepo->getTimeUntilNextDeparture($building);
 
-        $html = $this->render('game/_building_popup_content.html.twig', [
+        $nextDelivery = $deliveryRepo->findNextWaitingForBuilding($building);
+
+        $html = $this->render('game/popup/_building_popup_content.html.twig', [
             'building' => $building,
             'buildingType' => $buildingType,
             'level' => $level,
@@ -592,6 +607,7 @@ final class GameApiController extends AbstractController
             'neededWithLabels' => $upgradeInfo['neededWithLabels'] ?? [],
             'canUpgrade' => $upgradeInfo['canUpgrade'] ?? false,
             'timeRemaining' => $timeRemaining,
+            'scheduledAt' => $nextDelivery?->getScheduledAt()?->format('c'),
         ])->getContent();
 
         return new Response($html);
@@ -827,6 +843,7 @@ final class GameApiController extends AbstractController
                 'status' => 'ok',
                 'buildingId' => $building->getId(),
                 'chunkId' => $chunk->getChunkId(),
+                'refreshSidebar' => true,
             ]);
         } catch (\Exception $e) {
             return $this->json(['error' => 'Server error: ' . $e->getMessage()], 500);

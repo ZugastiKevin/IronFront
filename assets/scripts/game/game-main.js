@@ -3,6 +3,7 @@ import { initGPS } from './utils/gps.js';
 import { initBaseUI } from './buildings/base.js';
 import { initBuildMode } from './buildings/buildMode.js';
 import { initNotifications } from './notifications.js';
+import { initBuildingTimers } from './utils/timer.js';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -18,6 +19,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (window.currentUser) {
         initNotifications();
+        initDeliveryEvents();
+        initInventoryEvents();
+        initBuildingTimers();
     }
 });
 

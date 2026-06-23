@@ -1,0 +1,38 @@
+<div id="building-popup-{{ building.id }}" class="building-popup" data-building-id="{{ building.id }}">
+    <h3>{{ buildingType.label }}</h3>
+    <p>Niveau: {{ level }} / {{ maxLevel }}</p>
+
+    {% if production > 0 and resourceType %}
+        <p class="production-rate">
+            Production: <strong>{{ production }}</strong> {{ resourceLabel }}/h
+        </p>
+    {% endif %}
+
+    <div class="popup-actions">
+        {% if canUpgrade %}
+            <button onclick="window.upgradeBuilding({{ building.id }})" class="btn-upgrade">Améliorer</button>
+        {% else %}
+            <button disabled class="btn-upgrade">Améliorer</button>
+        {% endif %}
+
+        <div class="upgrade-costs">
+            {% for item in neededWithLabels %}
+                {% set has = available[item.code] ?? 0 %}
+                {% set cls = has >= item.quantity ? 'enough' : 'missing' %}
+                <div class="upgrade-resource">
+                    {{ item.label }}:
+                    <div class="resource-amount {{ cls }}" data-resource-code="{{ item.code }}" data-required="{{ item.quantity }}">{{ has }}</div>
+                    <div class="resource-amount {{ cls }}">/</div>
+                    <div class="resource-amount {{ cls }}">{{ item.quantity }}</div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div id="delivery-timer-{{ building.id }}"
+         class="delivery-timer-wrapper"
+         data-scheduled-at="{{ scheduledAt ?? '' }}"
+         data-building-id="{{ building.id }}">
+        <p class="delivery-timer">Chargement...</p>
+    </div>
+</div>

@@ -23,6 +23,5 @@ final class DatabaseEventPublisher implements EventPublisher
         $notification->setPayload($payload);
 
         $this->em->persist($notification);
-        $this->em->flush();
     }
 }

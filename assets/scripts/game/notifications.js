@@ -1,6 +1,18 @@
 export function initNotifications()
 {
-    // HTMX fait déjà le polling
+    document.body.addEventListener('htmx:afterSwap', (e) => {
+        const events = document.querySelectorAll('[data-event]');
+        events.forEach(el => {
+            try {
+                const event = JSON.parse(el.dataset.event);
+                document.dispatchEvent(new CustomEvent('game:event', { detail: event }));
+            } catch (err) {
+                console.error('Erreur parsing event:', err);
+            } finally {
+                el.remove();
+            }
+        });
+    });
 }
 
 export function showNotification(message, type = 'info') {

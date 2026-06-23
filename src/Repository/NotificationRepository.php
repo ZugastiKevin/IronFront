@@ -21,7 +21,8 @@ final class NotificationRepository extends ServiceEntityRepository
             ->where('n.player = :player')
             ->andWhere('n.readed = false')
             ->setParameter('player', $player)
-            ->orderBy('n.id', 'ASC')
+            ->orderBy('n.createdAt', 'DESC')
+            ->setMaxResults(10)
             ->getQuery()
             ->getResult();
     }

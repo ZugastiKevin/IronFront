@@ -9,9 +9,13 @@
             <button onclick="switchView('view-build')">🏗️ Construire</button>
             <button id="baseBtn" data-mode="return">🏠 Retour Base</button>
         {% else %}
-            <button id="baseBtn" class="btn-primary" data-mode="create" data-type-id="{{ type.id }}">
-                ✨ Créer mon camp (Base)
-            </button>
+            {% for type in buildingTypes %}
+                {% if type.code == 'base' %}
+                    <button id="baseBtn" class="btn-primary" data-mode="create" data-type-id="{{ type.id }}">
+                        ✨ Créer mon camp (Base)
+                    </button>
+                {% endif %}
+            {% endfor %}
         {% endif %}
 
         <button id="requestApiRoadsAndChunksBtn" class="btn-primary">📡 Sync Map</button>

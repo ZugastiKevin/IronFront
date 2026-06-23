@@ -17,8 +17,35 @@ class DeliveryRepository extends ServiceEntityRepository
     }
 
     /**
-     * Retourne les livraisons en transit.
-     * Si un joueur est fourni, limite aux livraisons du joueur.
+     * Livraisons IN_TRANSIT pour un joueur (carte)
+     */
+    public function findInTransitForPlayer(Player $player): array
+    {
+        return $this->createQueryBuilder('d')
+            ->where('d.player = :player')
+            ->andWhere('d.status = :status')
+            ->andWhere('d.waypoints IS NOT NULL')
+            ->setParameter('player', $player)
+            ->setParameter('status', DeliveryStatus::IN_TRANSIT)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Toutes les livraisons IN_TRANSIT (scheduler)
+     */
+    public function findInProgressAll(): array
+    {
+        return $this->createQueryBuilder('d')
+            ->where('d.status = :status')
+            ->andWhere('d.waypoints IS NOT NULL')
+            ->setParameter('status', DeliveryStatus::IN_TRANSIT)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Livraisons IN_TRANSIT pour un joueur avec un progress minimum
      */
     public function findInProgress(?Player $player = null, int $minProgress = 0): array
     {
@@ -38,74 +65,60 @@ class DeliveryRepository extends ServiceEntityRepository
     }
 
     /**
+     * Prochaine livraison WAITING pour un bâtiment (popup timer)
+     */
+    public function findNextWaitingForBuilding(Building $building): ?Delivery
+    {
+        return $this->createQueryBuilder('d')
+            ->where('d.sourceBuilding = :building')
+            ->andWhere('d.status = :status')
+            ->setParameter('building', $building)
+            ->setParameter('status', DeliveryStatus::WAITING)
+            ->orderBy('d.scheduledAt', 'ASC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
      * Temps restant avant la prochaine livraison d'un bâtiment.
-     * Ignore les livraisons déjà passées
-     * Retourne null si pas de livraison
      */
     public function getTimeUntilNextDeparture(Building $building): ?int
     {
-        $now = new \DateTimeImmutable();
-        $statuses = [DeliveryStatus::WAITING, DeliveryStatus::PENDING, DeliveryStatus::IN_TRANSIT];
+        $now      = new \DateTimeImmutable();
+        $statuses = [DeliveryStatus::WAITING, DeliveryStatus::IN_TRANSIT];
 
-        // Chercher la prochaine livraison par sourceBuilding (producteur)
         $delivery = $this->createQueryBuilder('d')
             ->where('d.sourceBuilding = :building')
             ->andWhere('d.status IN (:statuses)')
             ->andWhere('d.scheduledAt IS NOT NULL')
-            ->andWhere('d.scheduledAt > :now')
             ->setParameter('building', $building)
             ->setParameter('statuses', $statuses)
-            ->setParameter('now', $now)
             ->orderBy('d.scheduledAt', 'ASC')
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
 
-        // Si pas trouvé, chercher aussi par targetBuilding (base)
-        if (!$delivery) {
-            $delivery = $this->createQueryBuilder('d')
-                ->where('d.targetBuilding = :building')
-                ->andWhere('d.status IN (:statuses)')
-                ->andWhere('d.scheduledAt IS NOT NULL')
-                ->andWhere('d.scheduledAt > :now')
-                ->setParameter('building', $building)
-                ->setParameter('statuses', $statuses)
-                ->setParameter('now', $now)
-                ->orderBy('d.scheduledAt', 'ASC')
-                ->setMaxResults(1)
-                ->getQuery()
-                ->getOneOrNullResult();
-        }
-
         if (!$delivery) {
             return null;
         }
 
-        // Si la livraison est en attente (waiting), retourner le temps jusqu'au scheduledAt
-        if ($delivery->isWaiting()) {
-            $scheduledAt = $delivery->getScheduledAt();
-            if (!$scheduledAt) {
-                return null;
-            }
-
-            $remaining = $scheduledAt->getTimestamp() - $now->getTimestamp();
-            return max(0, (int) $remaining);
+        if ($delivery->getStatus() === DeliveryStatus::WAITING) {
+            $remaining = $delivery->getScheduledAt()->getTimestamp() - $now->getTimestamp();
+            return (int) $remaining; // peut être négatif si en retard
         }
 
-        // Si la livraison est en transit, calculer le temps restant basé sur le progrès
+        // IN_TRANSIT → temps restant basé sur le progress
         $estimatedTime = $delivery->getEstimatedTime();
-        $progress = $delivery->getProgress();
+        $progress      = $delivery->getProgress();
 
-        if ($progress >= 100) {
-            return 0;
-        }
+        if ($progress >= 100) return 0;
 
-        $remaining = (int) (($estimatedTime * (100 - $progress)) / 100);
-        return max(0, $remaining);
+        return max(0, (int)(($estimatedTime * (100 - $progress)) / 100));
     }
 
     /**
-     * Livraisons WAITING prêtes à partir.
+     * Livraisons WAITING prêtes à partir (scheduledAt <= now)
      */
     public function findWaiting(\DateTimeImmutable $now): array
     {
@@ -119,7 +132,7 @@ class DeliveryRepository extends ServiceEntityRepository
     }
 
     /**
-     * Livraison programmée à une date précise.
+     * Livraison programmée à une date précise pour un bâtiment.
      */
     public function findByBuildingAndScheduledAt(Building $building, \DateTimeImmutable $scheduledAt): ?Delivery
     {
@@ -134,22 +147,22 @@ class DeliveryRepository extends ServiceEntityRepository
     }
 
     /**
-     * Vérifie qu'une livraison WAITING existe déjà.
+     * Vérifie qu'une livraison WAITING ou IN_TRANSIT existe pour un bâtiment.
      */
     public function hasWaitingDeliveryForBuilding(Building $building): bool
     {
-        return (int)$this->createQueryBuilder('d')
+        return (int) $this->createQueryBuilder('d')
             ->select('COUNT(d.id)')
             ->where('d.sourceBuilding = :building')
-            ->andWhere('d.status = :status')
+            ->andWhere('d.status IN (:statuses)')
             ->setParameter('building', $building)
-            ->setParameter('status', DeliveryStatus::WAITING)
+            ->setParameter('statuses', [DeliveryStatus::WAITING, DeliveryStatus::IN_TRANSIT])
             ->getQuery()
             ->getSingleScalarResult() > 0;
     }
 
     /**
-     * Dernière livraison programmée.
+     * Dernière livraison programmée (tous statuts).
      */
     public function findLatestScheduledDelivery(Building $building): ?Delivery
     {
@@ -164,7 +177,7 @@ class DeliveryRepository extends ServiceEntityRepository
     }
 
     /**
-     * Dernière livraison terminée.
+     * Dernière livraison DELIVERED pour un bâtiment.
      */
     public function findLastDeliveredForBuilding(Building $building): ?Delivery
     {

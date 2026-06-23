@@ -156,7 +156,7 @@ async function checkCanClaim(deposit) {
 function createSimplePopup(deposit) {
     return `
         <div class="deposit-popup">
-            <h3>${deposit.type || 'Dépôt'}</h3>
+            <h3>${deposit.type || 'Dépôt de resource'}</h3>
         </div>
     `;
 }

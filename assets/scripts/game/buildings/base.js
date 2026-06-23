@@ -9,6 +9,7 @@ import { showNotification } from '../notifications.js';
 import { getAdminCoords } from '../utils/admin_clipboard.js';
 import { debugLog, debugWarn, debugError } from '../../utils/debug.js';
 import { drawBaseCircle, removeBaseCircle } from '../ui/drawOnMap.js';
+import { refreshSidebar } from './buildMode.js';
 
 // =======================
 // 🧠 STATE
@@ -242,11 +243,12 @@ function createBase(lat, lng) {
     })
     .then(res => {
         if (!res.ok) return res.json().then(err => { throw new Error(err.error || "API error") });
-        return res.json();
-    })
-    .then(() => {
-    baseCreated = true;
-    })
+                refreshSidebar().then(() => {
+                    // Ré-initialiser l'UI de base pour ré-attacher les listeners aux nouveaux boutons
+                    import('./base.js').then(({ initBaseUI }) => initBaseUI());
+            });
+        }
+)
     .catch(err => {
         debugError('bases', "Erreur création base", err);
         removeBase();
