@@ -10,7 +10,7 @@ use Doctrine\Migrations\AbstractMigration;
 /**
  * Auto-generated Migration: Please modify to your needs!
  */
-final class Version20260623092601 extends AbstractMigration
+final class Version20260623142717 extends AbstractMigration
 {
     public function getDescription(): string
     {
@@ -34,6 +34,7 @@ final class Version20260623092601 extends AbstractMigration
         $this->addSql('ALTER TABLE faction_building_image ADD CONSTRAINT FK_64AA8437F28401B9 FOREIGN KEY (building_type_id) REFERENCES building_type (id)');
         $this->addSql('ALTER TABLE game_resource_deposit ADD CONSTRAINT FK_F66ABDCDE48FD905 FOREIGN KEY (game_id) REFERENCES game (id)');
         $this->addSql('ALTER TABLE game_resource_deposit ADD CONSTRAINT FK_F66ABDCDF80DA337 FOREIGN KEY (resource_deposit_id) REFERENCES resource_deposit (id)');
+        $this->addSql('ALTER TABLE game_resource_deposit ADD CONSTRAINT FK_F66ABDCD4D2A7E12 FOREIGN KEY (building_id) REFERENCES building (id)');
         $this->addSql('ALTER TABLE notification ADD CONSTRAINT FK_BF5476CA99E6F5DF FOREIGN KEY (player_id) REFERENCES player (id)');
         $this->addSql('ALTER TABLE player ADD CONSTRAINT FK_98197A65A76ED395 FOREIGN KEY (user_id) REFERENCES user (id)');
         $this->addSql('ALTER TABLE player ADD CONSTRAINT FK_98197A65E48FD905 FOREIGN KEY (game_id) REFERENCES game (id)');
@@ -62,6 +63,7 @@ final class Version20260623092601 extends AbstractMigration
         $this->addSql('ALTER TABLE faction_building_image DROP FOREIGN KEY FK_64AA8437F28401B9');
         $this->addSql('ALTER TABLE game_resource_deposit DROP FOREIGN KEY FK_F66ABDCDE48FD905');
         $this->addSql('ALTER TABLE game_resource_deposit DROP FOREIGN KEY FK_F66ABDCDF80DA337');
+        $this->addSql('ALTER TABLE game_resource_deposit DROP FOREIGN KEY FK_F66ABDCD4D2A7E12');
         $this->addSql('ALTER TABLE notification DROP FOREIGN KEY FK_BF5476CA99E6F5DF');
         $this->addSql('ALTER TABLE player DROP FOREIGN KEY FK_98197A65A76ED395');
         $this->addSql('ALTER TABLE player DROP FOREIGN KEY FK_98197A65E48FD905');
