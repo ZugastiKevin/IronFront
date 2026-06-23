@@ -2,20 +2,28 @@
 
 namespace App\Repository;
 
-use Doctrine\DBAL\Connection;
+use App\Entity\Notification;
+use App\Entity\Player;
+use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\Persistence\ManagerRegistry;
 
-final readonly class NotificationRepository
+final class NotificationRepository extends ServiceEntityRepository
 {
     public function __construct(
-        private Connection $db,
+        ManagerRegistry $registry
     ) {
+        parent::__construct($registry, Notification::class);
     }
 
-    public function latest(int $limit = 10): array
+    public function latestForPlayer(Player $player): array
     {
-        return $this->db->fetchAllAssociative(
-            'SELECT * FROM notification ORDER BY id DESC LIMIT ?',
-            [$limit],
-        );
+        return $this->createQueryBuilder('n')
+            ->where('n.player = :player')
+            ->andWhere('n.readed = false')
+            ->setParameter('player', $player)
+            ->orderBy('n.createdAt', 'DESC')
+            ->setMaxResults(10)
+            ->getQuery()
+            ->getResult();
     }
 }

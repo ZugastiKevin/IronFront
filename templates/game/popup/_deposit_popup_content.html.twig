@@ -1,0 +1,41 @@
+<div id="deposit-popup-{{ deposit.id }}" class="deposit-popup" data-deposit-id="{{ deposit.id }}">
+    <h3>{{ deposit.resourceType.label }}</h3>
+    <p>Richesse: {{ deposit.richness }}</p>
+
+    <div class="popup-actions">
+        {% if isClaimed %}
+            <p class="already-claimed">⚠️ Déjà exploité</p>
+        {% else %}
+            {% if costs is empty %}
+                <button disabled class="btn-claim-deposit">Exploiter</button>
+            {% else %}
+                {% set canAfford = true %}
+                {% for item in costs %}
+                    {% if (available[item.code] ?? 0) < item.quantity %}
+                        {% set canAfford = false %}
+                    {% endif %}
+                {% endfor %}
+
+                {% if canAfford %}
+                    <button onclick="window.claimDeposit({{ deposit.id }}, '{{ deposit.resourceType.code.value }}')" class="btn-claim-deposit">Exploiter</button>
+                {% else %}
+                    <button disabled class="btn-claim-deposit">Ressources insuffisantes</button>
+                {% endif %}
+                <div class="deposit-costs">
+                    {% for item in costs %}
+                        {% set has = available[item.code] ?? 0 %}
+                        {% set cls = has >= item.quantity ? 'enough' : 'missing' %}
+                        <div class="deposit-resource">
+                            {{ item.label }}:
+                            <div class="resource-amount {{ cls }}" data-resource-code="{{ item.code }}" data-required="{{ item.quantity }}">{{ has }}</div>
+                            <div class="resource-amount {{ cls }}">/</div>
+                            <div class="resource-amount {{ cls }}">{{ item.quantity }}</div>
+                        </div>
+                    {% else %}
+                        <p class="no-costs">Coûts non disponibles</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>

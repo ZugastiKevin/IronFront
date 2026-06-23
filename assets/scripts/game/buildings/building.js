@@ -1,0 +1,285 @@
+import L from '../../LeafletWrapper.js';
+import { getMap } from '../map/map.js';
+import { getBuildingCosts, upgradeBuilding, getUpgradeInfo } from '../api.js';
+import { getCurrentPlayerFaction } from './base.js';
+import { debugLog, debugWarn, debugError } from '../../utils/debug.js';
+
+// Cache des informations de bâtiments
+let buildingMarkers = new Map();
+
+// Cache des popups déjà chargés
+let popupContentLoaded = new Set();
+
+// ID du joueur actif (initialisé depuis l'API)
+let currentPlayerId = null;
+
+/**
+ * Définit l'ID du joueur actif
+ * @param {number} id - L'ID du joueur connecté
+ */
+export function setCurrentPlayerId(id) {
+    currentPlayerId = id;
+}
+
+/**
+ * Charge les bâtiments sur la carte avec leurs popups interactifs
+ * @param {Array} buildings - Liste des bâtiments à afficher
+ */
+export function loadBuildingsFromData(buildings) {
+    const map = getMap();
+
+    if (!map) {
+        debugError('buildings', "Map not initialized");
+        return;
+    }
+
+    if (!buildings || !Array.isArray(buildings)) {
+        debugWarn('buildings', "loadBuildingsFromData: invalid buildings data");
+        return;
+    }
+
+    buildings.forEach(b => {
+        // Ignorer les bases - elles sont gérées par base.js
+        if (b.code === 'base' || b.type?.toLowerCase() === 'base') {
+            return;
+        }
+
+        if (!Number.isFinite(b.lat) || !Number.isFinite(b.lng)) {
+            debugWarn('buildings', "❌ Building ignoré (coord invalide)", b);
+            return;
+        }
+
+        // Utiliser la faction du bâtiment (ou fallback sur la faction du joueur)
+        const buildingFaction = b.faction || getCurrentPlayerFaction();
+
+        // Créer l'icône avec l'image du bâtiment
+        const icon = createBuildingIcon(b.code, buildingFaction);
+
+        // Stocker les données du building pour accès ultérieur
+        const buildingData = {
+            id: b.id,
+            type: b.type,
+            level: b.level,
+            code: b.code,
+            faction: buildingFaction,
+            ownerId: b.ownerId,
+            production: b.production || null,
+            resource_type: b.resource_type || null,
+        };
+
+        // Créer le marker avec popup vide (chargé au moment de l'ouverture)
+        const marker = L.marker([b.lat, b.lng], { icon })
+            .addTo(map)
+            .bindPopup(createSimplePopup(buildingData));
+
+        buildingMarkers.set(b.id, { marker, data: buildingData });
+
+        // Écouter l'ouverture de la popup pour charger le contenu
+        marker.on('popupopen', () => {
+            if (b.id && isOwnBuilding(buildingData)) {
+                loadUpgradeInfoAsync(b.id, marker, buildingData);
+            }
+        });
+    });
+}
+
+/**
+ * Vérifie si le bâtiment appartient au joueur actif
+ */
+function isOwnBuilding(building) {
+    return building.ownerId === currentPlayerId;
+}
+
+/**
+ * Crée un popup simple (synchrone)
+ */
+function createSimplePopup(building) {
+    return `
+        <div class="building-popup">
+            <h3>${building.type || 'Bâtiment'}</h3>
+        </div>
+    `;
+}
+
+/**
+ * Charge les infos d'amélioration en arrière-plan
+ */
+async function loadUpgradeInfoAsync(buildingId, marker, buildingData) {
+    // Ne pas charger les infos d'amélioration pour les bâtiments ennemis
+    if (!isOwnBuilding(buildingData)) {
+        marker.setPopupContent(createSimplePopup(buildingData));
+        return;
+    }
+
+    if (!buildingId) {
+        marker.setPopupContent(createSimplePopup(buildingData));
+        return;
+    }
+
+    // Éviter de recharger si déjà chargé
+    if (popupContentLoaded.has(buildingId)) {
+        return;
+    }
+    popupContentLoaded.add(buildingId);
+
+    try {
+        // Charger directement le contenu du popup
+        const res = await fetch(`/api/buildings/${buildingId}/popup-content`);
+
+        if (!res.ok) {
+            debugWarn('buildings', `Erreur API popup-content (building ${buildingId}):`, res.status);
+            marker.setPopupContent(createSimplePopup(buildingData));
+            return;
+        }
+
+        const html = await res.text();
+        marker.setPopupContent(html);
+        buildingMarkers.set(buildingId, { marker, data: buildingData });
+
+    } catch (e) {
+        debugError('buildings', "Erreur lors du chargement du popup", e);
+        marker.setPopupContent(createSimplePopup(buildingData));
+    }
+}
+
+/**
+ * Charge les bâtiments depuis l'API (fonction de compatibilité)
+ * @deprecated Utiliser loadBuildingsFromData(data) à la place
+ */
+export function loadBuildings() {
+    fetch('/api/map-data')
+        .then(res => res.json())
+        .then(data => {
+            loadBuildingsFromData(data);
+        })
+        .catch(err => {
+            debugError('buildings', "Erreur chargement bâtiments", err);
+        });
+}
+
+/**
+ * Crée une icône (marker) pour un bâtiment avec son image spécifique.
+ * @param {string} buildingCode - Le code du bâtiment (ex: "base", "iron_mine").
+ * @param {string} faction - La faction du bâtiment (optionnel, fallback sur le joueur actuel).
+ * @returns {L.Icon} L'icône Leaflet personnalisée.
+ */
+export function createBuildingIcon(buildingCode, faction = null) {
+    const actualFaction = faction || getCurrentPlayerFaction();
+    const size = 70; // Taille par défaut des icônes
+
+    return L.icon({
+        iconUrl: getBuildingImage(actualFaction, buildingCode),
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+        popupAnchor: [0, -size / 2]
+    });
+}
+
+/**
+ * Retourne dynamiquement le chemin de l'image avec fallback vers default.
+ * @param {string} faction - Le code ou nom de la faction (ex: "Empire", "Cendres").
+ * @param {string} building - Le code du bâtiment (ex: "base", "iron_mine").
+ * @returns {string} Le chemin de l'icône.
+ */
+export function getBuildingImage(faction, building) {
+    // Normaliser le nom du building pour l'image (remplacer espaces et caractères spéciaux)
+    const buildingSlug = building.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    const factionSlug = (faction || 'default').toLowerCase();
+
+    // Toujours utiliser l'icône de la faction en premier
+    // Le serveur ou le navigateur gérera le fallback si l'icône n'existe pas
+    // Si la faction est 'default', utiliser l'icône default directement
+    if (factionSlug === 'default') {
+        return `/assets/images/buildings/default/${buildingSlug}.png`;
+    }
+
+    return `/assets/images/buildings/${factionSlug}/${buildingSlug}.png`;
+}
+
+/**
+ * Améliore un bâtiment
+ */
+window.upgradeBuilding = async function(buildingId) {
+    try {
+        const response = await upgradeBuilding(buildingId);
+        const data = await response.json();
+
+        if (response.ok) {
+            // Invalider le cache pour forcer le rechargement
+            popupContentLoaded.delete(buildingId);
+
+            // Mettre à jour le marqueur
+            const entry = buildingMarkers.get(buildingId);
+            if (entry) {
+                entry.data.level = data.newLevel;
+                const marker = entry.marker;
+                marker.setPopupContent(createSimplePopup(entry.data));
+
+                // Recharger les infos d'amélioration
+                loadUpgradeInfoAsync(buildingId, marker, entry.data);
+            }
+            alert('Bâtiment amélioré avec succès !');
+        } else {
+            alert("Erreur: " + (data.error || "Impossible d'améliorer le bâtiment"));
+        }
+    } catch (e) {
+        debugError('buildings', "Erreur lors de l'amélioration", e);
+        alert("Erreur réseau lors de l'amélioration");
+    }
+};
+
+/**
+ * Retourne les informations sur les coûts de construction d'un type de bâtiment
+ */
+export async function getBuildingTypeCosts(buildingTypeId) {
+    try {
+        const response = await getBuildingCosts(buildingTypeId);
+        return await response.json();
+    } catch (e) {
+        debugError('buildings', "Erreur lors de la récupération des coûts", e);
+        return null;
+    }
+}
+
+/**
+ * Vérifie si le joueur peut construire un bâtiment
+ */
+export async function canBuildBuilding(buildingTypeId) {
+    const costs = await getBuildingTypeCosts(buildingTypeId);
+    if (!costs) return false;
+
+    const response = await fetch('/api/player-resources');
+    const data = await response.json();
+
+    const resources = {};
+    data.resources.forEach(r => {
+        resources[r.type] = r.quantity;
+    });
+
+    for (const [resource, amount] of Object.entries(costs.costs)) {
+        if ((resources[resource] || 0) < amount) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+export async function refreshBuildingPopup(buildingId) {
+    const entry = buildingMarkers.get(buildingId);
+
+    if (!entry) {
+        return;
+    }
+
+    // Optionnel : uniquement si le popup est ouvert
+    if (!entry.marker.isPopupOpen()) {
+        return;
+    }
+
+    await loadUpgradeInfoAsync(
+        buildingId,
+        entry.marker,
+        entry.data
+    );
+}

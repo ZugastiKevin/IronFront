@@ -1,0 +1,14 @@
+<div class="notification notification--{{ notification.type }}">
+    {% if notification.type == 'delivery_arrived' %}
+        📦 +{{ notification.payload.quantity ?? '' }} {{ notification.payload.label ?? '' }}
+    {% elseif notification.type == 'building_finished' %}
+        🏗️ Construction terminée
+    {% elseif notification.type == 'delivery_update' %}
+        🚚 Livraison en cours
+    {% endif %}
+</div>
+
+<div
+    data-event="{{ notification.payload|merge({'type': notification.type})|json_encode }}"
+    style="display:none"
+></div>

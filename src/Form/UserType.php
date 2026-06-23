@@ -21,6 +21,7 @@ class UserType extends AbstractType
         $builder
             ->add('pseudo', TextType::class, [
                 'label' => 'form.label.pseudo',
+                'invalid_message' => 'form.label.pseudo',
             ])
             ->add('email', EmailType::class, [
                 'label' => 'email',
@@ -43,7 +44,7 @@ class UserType extends AbstractType
                         'title' => 'form.error.error_ref',
                     ],
                     'constraints' => [
-                        ...(!$isEdit ? [new Assert\NotBlank(['message' => 'form.error_obligatory'])] : []),
+                        ...(!$isEdit ? [new Assert\NotBlank(message: 'form.error.error_obligatory')] : []),
                         new Assert\Length(min: 8, minMessage: 'form.error.error_password_length'),
                         new Assert\Regex('/[A-Z]/', 'form.error.error_upper'),
                         new Assert\Regex('/\d/',   'form.error.error_number'),
@@ -52,8 +53,7 @@ class UserType extends AbstractType
                     ],
                 ],
                 'second_options' => [
-                    'label_html' => true,
-                    'label' => '<span>' . 'confirm_password' . '</span>',
+                    'label' => 'confirm_password',
                 ],
             ])
         ;

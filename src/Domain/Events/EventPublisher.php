@@ -2,7 +2,9 @@
 
 namespace App\Domain\Events;
 
+use App\Entity\Player;
+
 interface EventPublisher
 {
-    public function publish(string $topic, array $payload): void;
+    public function publish(Player $player, string $type, array $payload = []): void;
 }

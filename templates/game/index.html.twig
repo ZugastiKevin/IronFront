@@ -11,12 +11,18 @@
     {{ encore_entry_link_tags('app') }}
     {{ encore_entry_script_tags('app') }}
     <section id="game">
-        {% include 'layout/_sidebar.html.twig' with {
-            'hasBase': hasBase,
-            'buildingTypes': buildingTypes
-        } %}
         <div class="game container">
             <div id="map"></div>
         </div>
+        {% include 'layout/_sidebar.html.twig' with {'hasBase': hasBase, 'buildingTypes': buildingTypes} %}
+
+        <div
+            id="event-bus"
+            hx-get="{{ path('events') }}"
+            hx-trigger="every 10s"
+            hx-swap="none">
+        </div>
+
+        <div id="notifications"></div>
     </section>
 {% endblock %}

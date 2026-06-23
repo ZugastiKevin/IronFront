@@ -10,7 +10,7 @@ use Doctrine\Migrations\AbstractMigration;
 /**
  * Auto-generated Migration: Please modify to your needs!
  */
-final class Version20260620141051 extends AbstractMigration
+final class Version20260623152830 extends AbstractMigration
 {
     public function getDescription(): string
     {
@@ -28,7 +28,8 @@ final class Version20260620141051 extends AbstractMigration
         $this->addSql('CREATE TABLE faction (id INT AUTO_INCREMENT NOT NULL, label VARCHAR(191) NOT NULL, code VARCHAR(100) NOT NULL, description LONGTEXT DEFAULT NULL, UNIQUE INDEX UNIQ_83048B9077153098 (code), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4');
         $this->addSql('CREATE TABLE faction_building_image (id INT AUTO_INCREMENT NOT NULL, image_path VARCHAR(191) NOT NULL, faction_id INT NOT NULL, building_type_id INT NOT NULL, INDEX IDX_64AA84374448F8DA (faction_id), INDEX IDX_64AA8437F28401B9 (building_type_id), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4');
         $this->addSql('CREATE TABLE game (id INT AUTO_INCREMENT NOT NULL, label VARCHAR(191) NOT NULL, started_at DATETIME NOT NULL, ended_at DATETIME DEFAULT NULL, description LONGTEXT DEFAULT NULL, is_active TINYINT NOT NULL, PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4');
-        $this->addSql('CREATE TABLE game_resource_deposit (id INT AUTO_INCREMENT NOT NULL, is_captured TINYINT NOT NULL, game_id INT NOT NULL, resource_deposit_id INT NOT NULL, INDEX IDX_F66ABDCDE48FD905 (game_id), INDEX IDX_F66ABDCDF80DA337 (resource_deposit_id), UNIQUE INDEX game_deposit_unique (game_id, resource_deposit_id), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4');
+        $this->addSql('CREATE TABLE game_resource_deposit (id INT AUTO_INCREMENT NOT NULL, is_captured TINYINT NOT NULL, game_id INT NOT NULL, resource_deposit_id INT NOT NULL, building_id INT DEFAULT NULL, INDEX IDX_F66ABDCDE48FD905 (game_id), INDEX IDX_F66ABDCDF80DA337 (resource_deposit_id), UNIQUE INDEX UNIQ_F66ABDCD4D2A7E12 (building_id), UNIQUE INDEX game_deposit_unique (game_id, resource_deposit_id), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4');
+        $this->addSql('CREATE TABLE notification (id INT AUTO_INCREMENT NOT NULL, type VARCHAR(50) NOT NULL, payload JSON NOT NULL, readed TINYINT NOT NULL, created_at DATETIME NOT NULL, player_id INT NOT NULL, INDEX IDX_BF5476CA99E6F5DF (player_id), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4');
         $this->addSql('CREATE TABLE player (id INT AUTO_INCREMENT NOT NULL, created_at DATETIME NOT NULL, user_id INT NOT NULL, game_id INT NOT NULL, faction_id INT NOT NULL, INDEX IDX_98197A65A76ED395 (user_id), INDEX IDX_98197A65E48FD905 (game_id), INDEX IDX_98197A654448F8DA (faction_id), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4');
         $this->addSql('CREATE TABLE player_inventory (id INT AUTO_INCREMENT NOT NULL, quantity INT NOT NULL, updated_at DATETIME NOT NULL, player_id INT NOT NULL, resource_type_id INT DEFAULT NULL, INDEX IDX_11217F0F99E6F5DF (player_id), INDEX IDX_11217F0F98EC6B7B (resource_type_id), UNIQUE INDEX player_resource_unique (player_id, resource_type_id), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4');
         $this->addSql('CREATE TABLE resource_deposit (id INT AUTO_INCREMENT NOT NULL, latitude DOUBLE PRECISION NOT NULL, longitude DOUBLE PRECISION NOT NULL, richness DOUBLE PRECISION NOT NULL, resource_type_id INT NOT NULL, road_id INT NOT NULL, INDEX IDX_C87B7AD198EC6B7B (resource_type_id), INDEX IDX_C87B7AD1962F8178 (road_id), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4');
@@ -50,6 +51,8 @@ final class Version20260620141051 extends AbstractMigration
         $this->addSql('ALTER TABLE faction_building_image ADD CONSTRAINT FK_64AA8437F28401B9 FOREIGN KEY (building_type_id) REFERENCES building_type (id)');
         $this->addSql('ALTER TABLE game_resource_deposit ADD CONSTRAINT FK_F66ABDCDE48FD905 FOREIGN KEY (game_id) REFERENCES game (id)');
         $this->addSql('ALTER TABLE game_resource_deposit ADD CONSTRAINT FK_F66ABDCDF80DA337 FOREIGN KEY (resource_deposit_id) REFERENCES resource_deposit (id)');
+        $this->addSql('ALTER TABLE game_resource_deposit ADD CONSTRAINT FK_F66ABDCD4D2A7E12 FOREIGN KEY (building_id) REFERENCES building (id)');
+        $this->addSql('ALTER TABLE notification ADD CONSTRAINT FK_BF5476CA99E6F5DF FOREIGN KEY (player_id) REFERENCES player (id)');
         $this->addSql('ALTER TABLE player ADD CONSTRAINT FK_98197A65A76ED395 FOREIGN KEY (user_id) REFERENCES user (id)');
         $this->addSql('ALTER TABLE player ADD CONSTRAINT FK_98197A65E48FD905 FOREIGN KEY (game_id) REFERENCES game (id)');
         $this->addSql('ALTER TABLE player ADD CONSTRAINT FK_98197A654448F8DA FOREIGN KEY (faction_id) REFERENCES faction (id)');
@@ -77,6 +80,8 @@ final class Version20260620141051 extends AbstractMigration
         $this->addSql('ALTER TABLE faction_building_image DROP FOREIGN KEY FK_64AA8437F28401B9');
         $this->addSql('ALTER TABLE game_resource_deposit DROP FOREIGN KEY FK_F66ABDCDE48FD905');
         $this->addSql('ALTER TABLE game_resource_deposit DROP FOREIGN KEY FK_F66ABDCDF80DA337');
+        $this->addSql('ALTER TABLE game_resource_deposit DROP FOREIGN KEY FK_F66ABDCD4D2A7E12');
+        $this->addSql('ALTER TABLE notification DROP FOREIGN KEY FK_BF5476CA99E6F5DF');
         $this->addSql('ALTER TABLE player DROP FOREIGN KEY FK_98197A65A76ED395');
         $this->addSql('ALTER TABLE player DROP FOREIGN KEY FK_98197A65E48FD905');
         $this->addSql('ALTER TABLE player DROP FOREIGN KEY FK_98197A654448F8DA');
@@ -94,6 +99,7 @@ final class Version20260620141051 extends AbstractMigration
         $this->addSql('DROP TABLE faction_building_image');
         $this->addSql('DROP TABLE game');
         $this->addSql('DROP TABLE game_resource_deposit');
+        $this->addSql('DROP TABLE notification');
         $this->addSql('DROP TABLE player');
         $this->addSql('DROP TABLE player_inventory');
         $this->addSql('DROP TABLE resource_deposit');

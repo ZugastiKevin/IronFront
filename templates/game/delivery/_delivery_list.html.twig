@@ -1,0 +1,16 @@
+<div id="delivery-list-content">
+{% if deliveries is empty %}
+    <p class="text-muted">Aucune livraison en cours</p>
+{% else %}
+    {% for delivery in deliveries %}
+    <div class="delivery-item in-transit">
+        <strong>{{ delivery.resource }}</strong><br>
+        <small>{{ delivery.quantity }} unités</small><br>
+        <div class="progress" style="height: 8px; margin: 5px 0;">
+            <div class="progress-bar" style="width: {{ delivery.progress }}%; height: 100%; background: #28a745;"></div>
+        </div>
+        <small>Progression: {{ delivery.progress }}%</small>
+    </div>
+    {% endfor %}
+{% endif %}
+</div>

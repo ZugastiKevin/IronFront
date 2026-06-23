@@ -14,7 +14,7 @@ class FactionGameChoiceType extends AbstractType
             ->add('game', EntityType::class, [
                 'label' => 'Partie à rejoindre',
                 'class' => Game::class,
-                'choice_label' => 'name',
+                'choice_label' => 'label',
                 'choice_attr' => function (Game $game) {
                     return [
                         'data-description' => $game->getDescription() ?? 'Partie #' . $game->getId(),
@@ -28,7 +28,8 @@ class FactionGameChoiceType extends AbstractType
             ->add('faction', EntityType::class, [
                 'label' => 'Faction à rejoindre',
                 'class' => Faction::class,
-                'choice_label' => 'name',
+                'choice_label' => 'label',
+                'placeholder' => false,
                 'choice_attr' => function (Faction $faction) {
                     return [
                         'data-description' => $faction->getDescription() ?? '',

@@ -1,0 +1,41 @@
+<div id="sideBar">
+    <!-- Vue 1: Menu Principal -->
+    <div id="view-main" class="sidebar-view">
+        {% if is_granted('ROLE_ADMIN') %}
+            <button onclick="window.enableAdminCoordinatePicker()">🔍 Admin</button>
+        {% endif %}
+
+        {% if hasBase %}
+            <button onclick="switchView('view-build')">🏗️ Construire</button>
+            <button id="baseBtn" data-mode="return">🏠 Retour Base</button>
+        {% else %}
+            {% for type in buildingTypes %}
+                {% if type.code == 'base' %}
+                    <button id="baseBtn" class="btn-primary" data-mode="create" data-type-id="{{ type.id }}">
+                        ✨ Créer mon camp (Base)
+                    </button>
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+
+        <button id="requestApiRoadsAndChunksBtn" class="btn-primary">📡 Sync Map</button>
+    </div>
+
+    <!-- Vue 2: Liste des bâtiments -->
+    <div id="view-build" class="sidebar-view" style="display: none;">
+        <button class="back-btn" onclick="switchView('view-main')">⬅️ Retour</button>
+        <hr>
+
+        <div class="build-instructions">Clique sur la carte pour construire</div>
+
+        {% for type in buildingTypes %}
+            {# Afficher tous les types de bâtiments #}
+            {% if type.code !== 'base' and type.maxLevel < 25 %}
+                {# Autres bâtiments - nécessitent une base #}
+                <button class="build-item" data-type-id="{{ type.id }}" {{ not hasBase ? 'disabled title="Base requise"' }}>
+                    {{ type.label }}
+                </button>
+            {% endif %}
+        {% endfor %}
+    </div>
+</div>

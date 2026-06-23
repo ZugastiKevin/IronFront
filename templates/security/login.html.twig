@@ -17,7 +17,7 @@
                             {% if app.user %}
                                 <div class="alert alert-success">
                                     <span>{{ 'logged_in_as'|trans }} {{ app.user.userIdentifier }}</span>
-                                    <a href="{{ path('app_logout') }}" class="btn btn-warning">{{ 'sign_out'|trans }}</a>
+                                    <a href="{{ path('logout') }}" class="btn btn-warning">{{ 'sign_out'|trans }}</a>
                                 </div>
                             {% endif %}
                         </div>

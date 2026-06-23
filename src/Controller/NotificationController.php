@@ -9,7 +9,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class NotificationController extends AbstractController
 {
-    #[Route('/notifications', name: 'app_notifications', methods: ['GET'])]
+    #[Route('/notifications', name: 'notifications', methods: ['GET'])]
     public function index(
         NotificationRepository $repository,
     ): Response {
