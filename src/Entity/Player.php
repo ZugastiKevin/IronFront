@@ -48,12 +48,19 @@ class Player
     #[ORM\OneToMany(targetEntity: Delivery::class, mappedBy: 'player')]
     private Collection $deliveries;
 
+    /**
+     * @var Collection<int, Notification>
+     */
+    #[ORM\OneToMany(mappedBy: 'player', targetEntity: Notification::class)]
+    private Collection $notifications;
+
     public function __construct()
     {
         $this->created_at = new \DateTimeImmutable();
         $this->buildings = new ArrayCollection();
         $this->playerInventories = new ArrayCollection();
         $this->deliveries = new ArrayCollection();
+        $this->notifications = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -170,6 +177,24 @@ class Player
         if (!$this->deliveries->contains($delivery)) {
             $this->deliveries->add($delivery);
             $delivery->setPlayer($this);
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Notification>
+     */
+    public function getNotifications(): Collection
+    {
+        return $this->notifications;
+    }
+
+    public function addNotification(Notification $notification): static
+    {
+        if (!$this->notifications->contains($notification)) {
+            $this->notifications->add($notification);
+            $notification->setPlayer($this);
         }
 
         return $this;
