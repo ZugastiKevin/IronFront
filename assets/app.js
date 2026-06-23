@@ -8,12 +8,14 @@ import '@fortawesome/fontawesome-free/js/all.js';
  */
 import './styles/app.scss';
 
-import './scripts/Layout/dropdown.js';
-import './scripts/Layout/switch_layout.js';
+import './scripts/layout/dropdown.js';
+import './scripts/layout/switch_layout.js';
 import './scripts/security/form.js';
 import './scripts/security/remember_me.js';
 import './scripts/security/reset-btn.js';
 
 
 // Game-specific scripts (only loaded on game pages)
-import './scripts/Game/utils/faction-game-choice.js';
+import './scripts/game/utils/faction-game-choice.js';
+
+import "leaflet/dist/leaflet.css";

@@ -1,0 +1,9 @@
+<div class="notification">
+    {% if notification.type == 'building_finished' %}
+        Construction terminée
+    {% endif %}
+    
+    {% if notification.type == 'delivery_arrived' %}
+        Livraison arrivée
+    {% endif %}
+</div>

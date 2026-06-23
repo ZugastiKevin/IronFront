@@ -32,7 +32,7 @@ final class GameController extends AbstractController
         $user = $this->getUser();
 
         if (!$user instanceof User) {
-            return $this->redirectToRoute('app_login');
+            return $this->redirectToRoute('login');
         }
 
         $form = $this->createForm(FactionGameChoiceType::class);
@@ -47,6 +47,7 @@ final class GameController extends AbstractController
             if ($existingPlayer !== null) {
                 // Le player existe déjà pour cette game : pas de choix de faction,
                 // on le reprend tel quel et on file directement sur /game
+                $request->getSession()->set('current_game_id', $selectedGame->getId());
                 $request->getSession()->set('active_player_id', $existingPlayer->getId());
 
                 return $this->redirectToRoute('game');
@@ -78,6 +79,7 @@ final class GameController extends AbstractController
             // Initialisation des données du nouveau joueur
             $playerGameInitializer->initialize($player);
 
+            $request->getSession()->set('current_game_id', $selectedGame->getId());
             $request->getSession()->set('active_player_id', $player->getId());
 
             return $this->redirectToRoute('game');
@@ -103,7 +105,7 @@ final class GameController extends AbstractController
         $user = $this->getUser();
 
         if (!$user instanceof User) {
-            return $this->redirectToRoute('app_login');
+            return $this->redirectToRoute('login');
         }
 
         // Aucun player du tout -> il faut en choisir/créer un

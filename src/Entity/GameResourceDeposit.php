@@ -22,6 +22,10 @@ class GameResourceDeposit
     #[ORM\JoinColumn(nullable: false)]
     private ?ResourceDeposit $resourceDeposit = null;
 
+    #[ORM\OneToOne(inversedBy: 'gameResourceDeposit')]
+    #[ORM\JoinColumn(name: 'building_id', referencedColumnName: 'id')]
+    private ?Building $building = null;
+
     #[ORM\Column]
     private bool $isCaptured = false;
 
@@ -62,6 +66,18 @@ class GameResourceDeposit
     public function setIsCaptured(bool $isCaptured): static
     {
         $this->isCaptured = $isCaptured;
+
+        return $this;
+    }
+
+    public function getBuilding(): ?Building
+    {
+        return $this->building;
+    }
+
+    public function setBuilding(?Building $building): static
+    {
+        $this->building = $building;
 
         return $this;
     }

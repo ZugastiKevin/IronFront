@@ -48,13 +48,13 @@
                         </li>
                     {% endif %}
                     <li class="btn-menu-navbar">
-                        <a href="{{ path('app_logout', {'_locale': app.request.locale}) }}">
+                        <a href="{{ path('logout', {'_locale': app.request.locale}) }}">
                             <span>{{ 'logout'|trans }}</span>
                         </a>
                     </li>
                 {% else %}
-                    <li class="btn-menu-navbar {{ currentRoute == 'app_login' ? 'active' : '' }}">
-                        <a href="{{ path('app_login', {'_locale': app.request.locale}) }}">
+                    <li class="btn-menu-navbar {{ currentRoute == 'login' ? 'active' : '' }}">
+                        <a href="{{ path('login', {'_locale': app.request.locale}) }}">
                             <span>{{ 'login'|trans }}</span>
                         </a>
                     </li>
@@ -80,13 +80,13 @@
                         </li>
                     {% endif %}
                     <li class="btn-menu-navbar">
-                        <a href="{{ path('app_logout', {'_locale': app.request.locale}) }}">
+                        <a href="{{ path('logout', {'_locale': app.request.locale}) }}">
                             <span>{{ 'logout'|trans }}</span>
                         </a>
                     </li>
                 {% else %}
                     <li class="btn-menu-navbar">
-                        <a href="{{ path('app_login', {'_locale': app.request.locale}) }}">
+                        <a href="{{ path('login', {'_locale': app.request.locale}) }}">
                             <span>{{ 'login'|trans }}</span>
                         </a>
                     </li>

@@ -3,19 +3,26 @@
 namespace App\Infrastructure;
 
 use App\Domain\Events\EventPublisher;
-use Doctrine\DBAL\Connection;
+use App\Entity\Notification;
+use App\Entity\Player;
+use Doctrine\ORM\EntityManagerInterface;
 
-class DatabaseEventPublisher implements EventPublisher
+final class DatabaseEventPublisher implements EventPublisher
 {
-    public function __construct(private Connection $db) {}
+    public function __construct(
+        private readonly EntityManagerInterface $em
+    ) {
+    }
 
-    public function publish(string $topic, array $payload): void
-    {
-        $this->db->insert('event_queue', [
-            'topic' => $topic,
-            'payload' => json_encode($payload),
-            'created_at' => (new \DateTime())->format('Y-m-d H:i:s'),
-            'processed' => 0
-        ]);
+    public function publish(Player $player, string $type, array $payload = []): void {
+
+        $notification = new Notification();
+
+        $notification->setPlayer($player);
+        $notification->setType($type);
+        $notification->setPayload($payload);
+
+        $this->em->persist($notification);
+        $this->em->flush();
     }
 }

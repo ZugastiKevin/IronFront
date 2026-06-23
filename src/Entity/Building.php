@@ -53,8 +53,8 @@ class Building
     #[ORM\JoinColumn(nullable: false)]
     private ?Chunk $chunk = null;
 
-    #[ORM\OneToOne(targetEntity: ResourceDeposit::class, mappedBy: 'building')]
-    private ?ResourceDeposit $resourceDeposit = null;
+    #[ORM\OneToOne(targetEntity: GameResourceDeposit::class, mappedBy: 'building', orphanRemoval: true)]
+    private ?GameResourceDeposit $gameResourceDeposit = null;
 
     #[ORM\OneToMany(targetEntity: Delivery::class, mappedBy: 'sourceBuilding')]
     private Collection $deliveries;
@@ -173,14 +173,14 @@ class Building
         return $this->latitudeBuild . ',' . $this->longitudeBuild;
     }
 
-    public function getResourceDeposit(): ?ResourceDeposit
+    public function getGameResourceDeposit(): ?GameResourceDeposit
     {
-        return $this->resourceDeposit;
+        return $this->gameResourceDeposit;
     }
 
-    public function setResourceDeposit(?ResourceDeposit $resourceDeposit): static
+    public function setGameResourceDeposit(?GameResourceDeposit $gameResourceDeposit): static
     {
-        $this->resourceDeposit = $resourceDeposit;
+        $this->gameResourceDeposit = $gameResourceDeposit;
         return $this;
     }
 

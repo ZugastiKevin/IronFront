@@ -5,10 +5,13 @@
             <button onclick="window.enableAdminCoordinatePicker()">🔍 Admin</button>
         {% endif %}
 
-        <button onclick="switchView('view-build')">🏗️ Construire</button>
-
         {% if hasBase %}
+            <button onclick="switchView('view-build')">🏗️ Construire</button>
             <button id="baseBtn" data-mode="return">🏠 Retour Base</button>
+        {% else %}
+            <button id="baseBtn" class="btn-primary" data-mode="create" data-type-id="{{ type.id }}">
+                ✨ Créer mon camp (Base)
+            </button>
         {% endif %}
 
         <button id="requestApiRoadsAndChunksBtn" class="btn-primary">📡 Sync Map</button>
@@ -22,28 +25,13 @@
         <div class="build-instructions">Clique sur la carte pour construire</div>
 
         {% for type in buildingTypes %}
-            {% if type.id == 1 %}
-                {% if hasBase %}
-                    
-                {% else %}
-                    <button id="baseBtn" class="btn-primary" data-mode="create" data-type-id="{{ type.id }}">
-                        ✨ Créer mon camp (Base)
-                    </button>
-                {% endif %}
-            {% else %}
-                {% if hasBase %}
-                    
-                {% else %}
-                    <button class="build-item" disabled title="Base requise">
-                        {{ type.label }} (Base requise)
-                    </button>
-                {% endif %}
+            {# Afficher tous les types de bâtiments #}
+            {% if type.code !== 'base' and type.maxLevel < 25 %}
+                {# Autres bâtiments - nécessitent une base #}
+                <button class="build-item" data-type-id="{{ type.id }}" {{ not hasBase ? 'disabled title="Base requise"' }}>
+                    {{ type.label }}
+                </button>
             {% endif %}
         {% endfor %}
-
-        <hr>
-        <div class="build-note">
-            <small>💡 Pour les mines, cliquez sur "Exploiter" dans les gisements</small>
-        </div>
     </div>
 </div>

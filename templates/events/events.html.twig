@@ -1,0 +1,5 @@
+{% for notification in notifications %}
+    <div hx-swap-oob="beforeend:#notifications">
+        {% include 'events/_notification.html.twig' %}
+    </div>
+{% endfor %}
