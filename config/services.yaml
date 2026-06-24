@@ -46,3 +46,11 @@ services:
 
     # Event Publisher
     App\Domain\Events\EventPublisher: '@App\Infrastructure\DatabaseEventPublisher'
+
+    App\Command\RunExpansionLoopCommand:
+        arguments:
+            $cache: '@cache.app'
+
+    App\Command\WorldExpansionCommand:
+        arguments:
+            $cache: '@cache.app'

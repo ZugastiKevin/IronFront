@@ -37,34 +37,23 @@ class GenerateChunkService
     public function generate(float $lat, float $lng): array
     {
         $chunkId = $this->coordinateService->getChunkId($lat, $lng);
-        $chunk = $this->chunkRepository->findOrCreate($chunkId);
+        $chunk   = $this->chunkRepository->findOrCreate($chunkId);
 
         if ($chunk->getRoads()->count() > 0) {
-            $this->logger->info("Génération de routes annulée pour le chunk {$chunkId} : déjà peuplé.");
+            $this->logger->info("Chunk {$chunkId} déjà peuplé, annulation.");
             return [];
         }
-        
-        $this->logger->info("Démarrage de la génération de routes pour le chunk {$chunkId}...");
-        $roads = $this->fetchFromOverpass($lat, $lng, $chunk);
 
+        $roads    = $this->fetchFromOverpass($lat, $lng, $chunk);
         $allTypes = $this->resourceTypeRepository->findAll();
+        $allTypes = array_values(array_filter($allTypes, fn($rt) => !empty($rt->getColor())));
 
         if (empty($allTypes)) {
-            $this->logger->warning("Aucun type de ressource trouvé en base de données !");
+            $this->logger->warning("Aucun type de ressource extractible trouvé.");
             return $roads;
         }
 
-        // Filtrer pour n'inclure que les ressources extractibles (avec couleur définie)
-        $allTypes = array_filter($allTypes, fn($rt) => !empty($rt->getColor()));
-
-        // Vérifier qu'il reste des types valides après filtrage
-        if (empty($allTypes)) {
-            $this->logger->warning("Aucun type de ressource extractible trouvé (avec couleur définie) !");
-            return $roads;
-        }
-
-        // Toujours générer au moins un dépôt si des routes existent
-        $depositCount = !empty($roads) ? rand(1, min(2, count($roads))) : 0;
+        $depositCount  = !empty($roads) ? rand(1, min(2, count($roads))) : 0;
         $selectedRoads = [];
 
         if ($depositCount > 0) {
@@ -73,11 +62,8 @@ class GenerateChunkService
             $selectedRoads = array_slice($shuffled, 0, $depositCount);
 
             foreach ($selectedRoads as $road) {
-                // Sélectionner une ressource selon sa rareté
-                // 0 = Commun (80%), 1 = Rare (15%), 2 = Très rare (5%)
                 $randomType = $this->selectResourceByRarity($allTypes);
-
-                $deposit = new ResourceDeposit($randomType, (float)rand(8, 20) / 10);
+                $deposit = new ResourceDeposit($randomType, $this->generateRichness());
                 $deposit->setRoad($road);
 
                 $points = $road->getPoints();
@@ -87,60 +73,44 @@ class GenerateChunkService
                 }
 
                 $this->em->persist($deposit);
-                $this->logger->info("Dépôt [{$randomType->getCode()}] généré sur la route {$road->getId()}.");
+                $this->logger->info("Dépôt [{$randomType->getCode()->value}] généré sur route {$road->getId()}.");
             }
         }
 
         $this->em->flush();
+        $this->logger->info("Chunk {$chunkId} : " . count($roads) . " routes, " . count($selectedRoads) . " dépôt(s).");
 
-        $actualDepositCount = count($selectedRoads);
-        $this->logger->info("Génération terminée pour le chunk {$chunkId} : " . count($roads) . " routes, {$actualDepositCount} dépôt(s).");
         return $roads;
     }
 
-    /**
-     * Interroge l'API Overpass pour récupérer les données de routes dans une zone géographique
-     * et les persiste en base de données.
-     *
-     * @param float $lat
-     * @param float $lng
-     * @param Chunk $chunk L'entité Chunk à laquelle associer les routes
-     * @return array
-     */
     private function fetchFromOverpass(float $lat, float $lng, Chunk $chunk): array
     {
-        // Définit la "boîte" de coordonnées à interroger
-        $size = 0.01;
-        $x = floor($lat / $size);
-        $y = floor($lng / $size);
+        $size   = 0.01;
+        $x      = floor($lat / $size);
+        $y      = floor($lng / $size);
         $latMin = $x * $size;
         $latMax = ($x + 1) * $size;
         $lngMin = $y * $size;
         $lngMax = ($y + 1) * $size;
 
-        // Requête Overpass QL
-        $query = "[out:json][timeout:25];way[\"highway\"]($latMin,$lngMin,$latMax,$lngMax);out geom;";
-        $url = "https://overpass-api.de/api/interpreter";
-
-        // Appel à l'API avec gestion basique des erreurs
+        $query    = "[out:json][timeout:25];way[\"highway\"]($latMin,$lngMin,$latMax,$lngMax);out geom;";
+        $url      = "https://overpass-api.de/api/interpreter";
         $response = @file_get_contents($url, false, stream_context_create([
             'http' => [
-                'method' => 'POST',
-                'header' => "Content-Type: application/x-www-form-urlencoded\r\nUser-Agent: MyGame/1.0",
+                'method'  => 'POST',
+                'header'  => "Content-Type: application/x-www-form-urlencoded\r\nUser-Agent: IronFront/1.0",
                 'content' => http_build_query(['data' => $query]),
-                'timeout' => 20
+                'timeout' => 20,
             ]
         ]));
 
         if ($response === false) {
-            $this->logger->error("Échec de l'appel à Overpass API pour le chunk " . $chunk->getChunkId());
+            $this->logger->error("Échec Overpass pour chunk " . $chunk->getChunkId());
             return [];
         }
 
         $data = json_decode($response, true);
-
         if (!isset($data['elements'])) {
-            $this->logger->warning("Aucun élément 'elements' dans la réponse d'Overpass pour le chunk " . $chunk->getChunkId());
             return [];
         }
 
@@ -153,61 +123,53 @@ class GenerateChunkService
                 if (!isset($node['lat'], $node['lon'])) continue;
                 $points[] = [(float)$node['lat'], (float)$node['lon']];
             }
-
             if (count($points) < 2) continue;
 
-            // Crée et persiste l'entité Road
             $road = new Road();
             $road->setChunk($chunk);
             $road->setPoints($points);
             $road->setType($way['tags']['highway'] ?? 'road');
             $this->em->persist($road);
-
             $roads[] = $road;
         }
 
-        // Met à jour la date de modification du chunk pour l'invalidation du cache
         $chunk->setUpdatedAt(new \DateTimeImmutable());
         $this->em->persist($chunk);
 
-        $this->em->flush();
-
-        $this->logger->info(count($roads) . " routes générées pour le chunk " . $chunk->getChunkId());
-
+        $this->logger->info(count($roads) . " routes récupérées pour chunk " . $chunk->getChunkId());
         return $roads;
     }
 
-    /**
-     * Sélectionne une ressource selon sa rareté.
-     * 0 = Commun (80%), 1 = Rare (15%), 2 = Très rare (5%)
-     */
     private function selectResourceByRarity(array $types): ResourceType
     {
         $roll = rand(1, 100);
 
         if ($roll <= 10) {
-            // Très rare (10%)
-            $rareTypes = array_filter($types, fn($rt) => $rt->getRarity() >= 2);
-            if (!empty($rareTypes)) {
-                return $rareTypes[array_rand($rareTypes)];
-            }
+            $filtered = array_values(array_filter($types, fn($rt) => $rt->getRarity() >= 2));
+            if (!empty($filtered)) return $filtered[array_rand($filtered)];
         }
 
         if ($roll <= 25) {
-            // Rare (20%)
-            $rareTypes = array_filter($types, fn($rt) => $rt->getRarity() >= 1);
-            if (!empty($rareTypes)) {
-                return $rareTypes[array_rand($rareTypes)];
-            }
+            $filtered = array_values(array_filter($types, fn($rt) => $rt->getRarity() >= 1));
+            if (!empty($filtered)) return $filtered[array_rand($filtered)];
         }
 
-        // Commun (70%)
-        $commonTypes = array_filter($types, fn($rt) => $rt->getRarity() === 0);
-        if (!empty($commonTypes)) {
-            return $commonTypes[array_rand($commonTypes)];
-        }
+        $common = array_values(array_filter($types, fn($rt) => $rt->getRarity() === 0));
+        if (!empty($common)) return $common[array_rand($common)];
 
-        // Fallback : retourne n'importe quel type disponible
         return $types[array_rand($types)];
+    }
+
+    private function generateRichness(): float
+    {
+        $roll = rand(1, 100);
+
+        return match(true) {
+            $roll <= 10  => 0.6,  // très pauvre (10%)
+            $roll <= 25  => 0.8,  // pauvre (15%)
+            $roll <= 60  => 1.0,  // normal (35%)
+            $roll <= 85  => 1.2,  // riche (25%)
+            default      => 1.4,  // très riche (15%)
+        };
     }
 }
