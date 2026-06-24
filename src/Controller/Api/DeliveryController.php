@@ -120,8 +120,8 @@ final class DeliveryController extends AbstractController
             return [
                 'deliveryId'    => $d->getId(),
                 'buildingId'    => $d->getSourceBuilding()?->getId(),
-                'progress'      => $progress,                           // ✅ calculé live
-                'scheduledAt'   => $scheduledAt?->format('c'),          // ✅ ISO pour le JS
+                'progress'      => $progress,
+                'scheduledAt'   => $scheduledAt?->format('c'),
                 'estimatedTime' => $estimatedTime,
                 'waypoints'     => $d->getWaypoints(),
                 'resource'      => $d->getResource()?->getCode()?->value,
@@ -148,11 +148,11 @@ final class DeliveryController extends AbstractController
         $deliveries = $deliveryRepository->findInTransitForPlayer($player);
 
         $formatted = array_map(fn(Delivery $d) => [
-            'resource'    => $d->getResource()?->getCode()?->value, // ✅
+            'resource'    => $d->getResource()?->getCode()?->value,
             'label'       => $d->getResource()?->getLabel(),
             'quantity'    => $d->getQuantity(),
             'progress'    => $d->getProgress(),
-            'scheduledAt' => $d->getScheduledAt()?->format('c'), // ✅ ISO pour formatage JS
+            'scheduledAt' => $d->getScheduledAt()?->format('c'),
         ], $deliveries);
 
         return $this->render('game/delivery/_delivery_list.html.twig', [

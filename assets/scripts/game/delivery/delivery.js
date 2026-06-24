@@ -145,7 +145,6 @@ function upsertDelivery(data) {
                 <strong>Camion n°${key}</strong><br>
                 Transporte : ${data.quantity ?? ''} unités de <strong>${data.resourceLabel ?? ''}</strong><br>
                 <span class="delivery-progress-${key}">Progression : ${data.progress ?? 0}%</span><br>
-                <small class="text-muted">Départ prévu : ${scheduledTime}</small>
             `);
 
         activeDeliveries.set(key, {
