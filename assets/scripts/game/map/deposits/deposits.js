@@ -201,10 +201,7 @@ export function renderDepositsFromData(deposits, map) {
         const type = deposit.resource_type;
         const layer = depositLayers[type];
 
-        if (!layer) {
-            debugWarn('deposits', `Pas de layer pour le type: ${type}`);
-            return;
-        }
+        if (!layer) return;
 
         const color = getResourceColor(type);
 

@@ -22,7 +22,7 @@ let mapInstance = null;
 let moveTimeout = null;
 let isChunkMode = false;
 
-export function initMap(lat, lng) {
+export async function initMap(lat, lng) {
 
     mapInstance = L.map('map').setView([lat, lng], 7);
 
@@ -37,7 +37,7 @@ export function initMap(lat, lng) {
         "Chunk Grid": gridLayer
     }).addTo(mapInstance);
 
-    initDepositLayers(mapInstance, layersControl);
+    await initDepositLayers(mapInstance, layersControl);
 
     // =====================
     // CENTRAL CHUNK CONTROLLER
@@ -125,14 +125,9 @@ export function loadWorld() {
                 let hasCentered = false;
 
                 data.players.forEach(player => {
-
-                    console.log("Loading player:", player.pseudo, "Faction:", player.faction, "IsMe:", player.isMe);
-
                     if (player.isMe) {
                         setCurrentPlayerFaction(player.faction);
                         loadBaseFromServer(player.lat, player.lng);
-
-                        console.log("Player faction set to:", player.faction , "Player base loaded at:", player.lat, player.lng);
 
                         if (!hasCentered) {
                             flyTo(player.lat, player.lng, 16);

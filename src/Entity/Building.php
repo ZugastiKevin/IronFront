@@ -224,4 +224,14 @@ class Building
 
         return $this;
     }
+
+    public function getPlayerPseudo(): ?string
+    {
+        return $this->player?->getUser()?->getPseudo();
+    }
+
+    public function getGameLabel(): ?string
+    {
+        return $this->player?->getGame()?->getLabel();
+    }
 }

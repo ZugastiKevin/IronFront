@@ -1,5 +1,6 @@
 import L from '../../../LeafletWrapper.js';
 import { getMap } from '../map.js';
+import { debugLog } from '../../../utils/debug.js';
 
 /**
  * Trouve le point le plus proche sur toutes les routes
@@ -23,7 +24,7 @@ export function findClosestPointOnRoad(latlng, roads) {
             const bRaw = road.points[i + 1];
 
             if (!aRaw || !bRaw) {
-                console.warn("BROKEN ROAD SEGMENT:", road);
+                debugWarn("roads", "BROKEN ROAD SEGMENT:", road);
             }
 
             if (aRaw.length < 2 || bRaw.length < 2) continue;
@@ -131,5 +132,5 @@ export function distanceToSegment(p, a, b) {
  * Check simple debug roads
  */
 export function debugRoads(roads) {
-    console.log("ROADS DEBUG:", roads.length, roads);
+    debugLog("roads", "ROADS DEBUG:", roads.length, roads);
 }

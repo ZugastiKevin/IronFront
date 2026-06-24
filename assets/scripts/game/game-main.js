@@ -6,6 +6,7 @@ import { initNotifications } from './notifications.js';
 import { initBuildingTimers } from './utils/timer.js';
 import { initDeliveryEvents } from './delivery/delivery.js';
 import { initInventoryEvents } from './inventory/inventory.js';
+import { debugLog } from '../utils/debug.js';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -36,20 +37,20 @@ export function enableLeafletDebug(debug = false) {
     const originalPolyline = L.polyline;
 
     L.marker = function (...args) {
-        console.log("🧨 MARKER CALL:", args);
-        console.trace("MARKER STACK");
+        debugLog("leaflet", "🧨 MARKER CALL:", args);
+        debugLog("leaflet", "MARKER STACK");
         return originalMarker.apply(this, args);
     };
 
     L.circle = function (...args) {
-        console.log("🧨 CIRCLE CALL:", args);
-        console.trace("CIRCLE STACK");
+        debugLog("leaflet", "🧨 CIRCLE CALL:", args);
+        debugLog("leaflet", "CIRCLE STACK");
         return originalCircle.apply(this, args);
     };
 
     L.polyline = function (...args) {
-        console.log("🧨 POLYLINE CALL:", args);
-        console.trace("POLYLINE STACK");
+        debugLog("leaflet", "🧨 POLYLINE CALL:", args);
+        debugLog("leaflet", "POLYLINE STACK");
         return originalPolyline.apply(this, args);
     };
 }

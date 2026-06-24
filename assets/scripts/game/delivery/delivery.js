@@ -49,9 +49,21 @@ export function initDeliveryEvents() {
 // ==========================
 export function initDeliveryLayers() {
     const map = getMap();
-    if (!map || deliveryLayer) return;
+    if (!map) return;
+
+    if (!deliveryLayer || deliveryLayer._map !== map) {
+
+        if (deliveryLayer) {
+            deliveryLayer.remove();
+        }
+
+        deliveryLayer = L.layerGroup().addTo(map);
+    }
+
     deliveryLayer = L.layerGroup().addTo(map);
+
     startAnimation();
+    
     pendingEvents.forEach(processDeliveryEvent);
     pendingEvents.length = 0;
 }
