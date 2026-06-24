@@ -148,10 +148,11 @@ final class DeliveryController extends AbstractController
         $deliveries = $deliveryRepository->findInTransitForPlayer($player);
 
         $formatted = array_map(fn(Delivery $d) => [
-            'resource' => $d->getResource()?->getCode()?->value, // ✅
-            'label'    => $d->getResource()?->getLabel(),
-            'quantity' => $d->getQuantity(),
-            'progress' => $d->getProgress(),
+            'resource'    => $d->getResource()?->getCode()?->value, // ✅
+            'label'       => $d->getResource()?->getLabel(),
+            'quantity'    => $d->getQuantity(),
+            'progress'    => $d->getProgress(),
+            'scheduledAt' => $d->getScheduledAt()?->format('c'), // ✅ ISO pour formatage JS
         ], $deliveries);
 
         return $this->render('game/delivery/_delivery_list.html.twig', [

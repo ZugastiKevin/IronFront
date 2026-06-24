@@ -2,6 +2,7 @@ import L from '../../LeafletWrapper.js';
 import { getMap } from '../map/map.js';
 import { drawRoadSegment } from '../ui/drawOnMap.js';
 import { debugLog, debugWarn, debugError } from '../../utils/debug.js';
+import { formatDate } from '../utils/timer.js';
 
 // State
 const activeDeliveries = new Map();
@@ -37,7 +38,7 @@ export function initDeliveryEvents() {
             resourceLabel: data.resourceLabel,
             quantity:      data.quantity,
             estimatedTime: data.duration,
-            scheduledAt:   data.scheduledAt,  // ✅ timestamp ISO
+            scheduledAt:   data.scheduledAt,
             faction:       data.faction ?? 'default',
         });
     });
@@ -70,7 +71,7 @@ export async function loadDeliveries() {
                 buildingId:    d.buildingId,
                 status:        'in_transit',
                 progress:      d.progress,
-                scheduledAt:   d.scheduledAt,   // ✅ timestamp ISO depuis l'API
+                scheduledAt:   d.scheduledAt,
                 estimatedTime: d.estimatedTime,
                 waypoints:     d.waypoints,
                 resource:      d.resource,
@@ -79,7 +80,7 @@ export async function loadDeliveries() {
                 faction:       d.faction || 'default',
             };
             debugLog('delivery', 'Loading delivery from API:', deliveryData);
-            handleDeliveryEvent(deliveryData); // ✅ appel manquant corrigé
+            handleDeliveryEvent(deliveryData);
         });
     } catch (e) {
         debugError('delivery', 'Failed to load deliveries:', e);
@@ -128,18 +129,23 @@ function upsertDelivery(data) {
         delivery.waypoints          = latlngs;
         delivery.progress           = data.progress ?? delivery.progress;
         delivery.estimatedTime      = data.estimatedTime;
-        delivery.scheduledAt        = data.scheduledAt ?? delivery.scheduledAt; // ✅
+        delivery.scheduledAt        = data.scheduledAt ?? delivery.scheduledAt;
         delivery.lastServerProgress = data.progress ?? 0;
         delivery.lastServerTime     = Date.now();
         delivery.faction            = faction;
     } else {
         const polyline = drawRoadSegment(`delivery-${key}`, latlngs, faction);
+
+        // Formater l'heure du départ prévu
+        const scheduledTime = data.scheduledAt ? formatDate(data.scheduledAt) : 'Inconnue';
+
         const marker = L.marker(latlngs[0], { icon: truckIcon })
             .addTo(deliveryLayer)
             .bindPopup(`
                 <strong>Camion n°${key}</strong><br>
                 Transporte : ${data.quantity ?? ''} unités de <strong>${data.resourceLabel ?? ''}</strong><br>
-                <span class="delivery-progress-${key}">Progression : ${data.progress ?? 0}%</span>
+                <span class="delivery-progress-${key}">Progression : ${data.progress ?? 0}%</span><br>
+                <small class="text-muted">Départ prévu : ${scheduledTime}</small>
             `);
 
         activeDeliveries.set(key, {
@@ -148,7 +154,7 @@ function upsertDelivery(data) {
             waypoints:          latlngs,
             progress:           data.progress ?? 0,
             estimatedTime:      data.estimatedTime ?? 3600,
-            scheduledAt:        data.scheduledAt ?? null, // ✅ timestamp ISO serveur
+            scheduledAt:        data.scheduledAt ?? null,
             lastServerProgress: data.progress ?? 0,
             lastServerTime:     Date.now(),
             resource:           data.resource,
@@ -180,7 +186,6 @@ function startAnimation() {
             let interpolatedProgress;
 
             if (delivery.scheduledAt) {
-                // ✅ calcul basé sur le temps réel depuis le départ
                 // résistant au reload de page
                 const startTime = new Date(delivery.scheduledAt).getTime();
                 const elapsed   = (now - startTime) / 1000;

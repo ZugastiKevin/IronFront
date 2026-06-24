@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Scheduler;
+namespace App\Command;
 
 use App\Message\ProcessProductionMessage;
 use Symfony\Component\Scheduler\Attribute\AsSchedule;

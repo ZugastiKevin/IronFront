@@ -9,7 +9,8 @@
         <div class="progress" style="height: 8px; margin: 5px 0;">
             <div class="progress-bar" style="width: {{ delivery.progress }}%; height: 100%; background: #28a745;"></div>
         </div>
-        <small>Progression: {{ delivery.progress }}%</small>
+        <small>Progression: {{ delivery.progress }}%</small><br>
+        <small class="text-muted">Départ: {{ delivery.scheduledAt ? delivery.scheduledAt|date('H:i') : 'Inconnue' }}</small>
     </div>
     {% endfor %}
 {% endif %}

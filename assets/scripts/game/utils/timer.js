@@ -33,3 +33,11 @@ export function initBuildingTimers() {
     updateTimers();
     setInterval(updateTimers, 1000);
 }
+
+export function formatDate(isoString) {
+    return new Date(isoString).toLocaleString('fr-FR', {
+        timeZone: 'Europe/Paris',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
