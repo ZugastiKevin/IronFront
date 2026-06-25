@@ -2,9 +2,11 @@
 
 namespace App\Service\Game\Building;
 
+use App\Entity\Player;
+
 final class BuildingTransformer
 {
-    public function transform(array $buildings): array
+    public function transform(array $buildings, Player $currentPlayer): array
     {
         $data = [];
 
@@ -23,6 +25,7 @@ final class BuildingTransformer
                 'ownerId' => $b->getPlayer()->getId(),
                 'production' => $prod ?: null,
                 'resource_type' => $type->getResourceType()?->getLabel(),
+                'isMine' => $b->getPlayer()->getId() === $currentPlayer->getId(),
             ];
         }
 

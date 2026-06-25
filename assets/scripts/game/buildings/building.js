@@ -10,17 +10,6 @@ let buildingMarkers = new Map();
 // Cache des popups déjà chargés
 let popupContentLoaded = new Set();
 
-// ID du joueur actif (initialisé depuis l'API)
-let currentPlayerId = null;
-
-/**
- * Définit l'ID du joueur actif
- * @param {number} id - L'ID du joueur connecté
- */
-export function setCurrentPlayerId(id) {
-    currentPlayerId = id;
-}
-
 /**
  * Charge les bâtiments sur la carte avec leurs popups interactifs
  * @param {Array} buildings - Liste des bâtiments à afficher
@@ -63,6 +52,7 @@ export function loadBuildingsFromData(buildings) {
             code: b.code,
             faction: buildingFaction,
             ownerId: b.ownerId,
+            isMine: Boolean(b.isMine),
             production: b.production || null,
             resource_type: b.resource_type || null,
         };
@@ -76,18 +66,30 @@ export function loadBuildingsFromData(buildings) {
 
         // Écouter l'ouverture de la popup pour charger le contenu
         marker.on('popupopen', () => {
-            if (b.id && isOwnBuilding(buildingData)) {
-                loadUpgradeInfoAsync(b.id, marker, buildingData);
-            }
+            handlePopupOpen(buildingData, marker);
         });
     });
+}
+
+/**
+ * Centralise la logique popup
+ */
+function handlePopupOpen(buildingData, marker) {
+    if (!buildingData?.id) return;
+
+    if (!isOwnBuilding(buildingData)) {
+        marker.setPopupContent(createSimplePopup(buildingData));
+        return;
+    }
+    
+    loadUpgradeInfoAsync(buildingData.id, marker, buildingData);
 }
 
 /**
  * Vérifie si le bâtiment appartient au joueur actif
  */
 function isOwnBuilding(building) {
-    return building.ownerId === currentPlayerId;
+    return building.isMine === true;
 }
 
 /**

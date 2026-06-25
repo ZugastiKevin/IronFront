@@ -2,25 +2,26 @@
   "entrypoints": {
     "app": {
       "js": [
-        "/build/runtime.6d1d3c17.js",
-        "/build/618.89ed990b.js",
-        "/build/135.31888e33.js",
-        "/build/app.c4e4afc1.js"
+        "/build/runtime.js",
+        "/build/vendors-node_modules_leaflet_dist_leaflet_css-node_modules_core-js_internals_add-to-unscopabl-467c3d.js",
+        "/build/vendors-node_modules_fortawesome_fontawesome-free_js_all_js-node_modules_fortawesome_fontawes-27c7a3.js",
+        "/build/app.js"
       ],
       "css": [
-        "/build/135.d29b3d5b.css",
-        "/build/app.8dbb7998.css"
+        "/build/vendors-node_modules_leaflet_dist_leaflet_css-node_modules_core-js_internals_add-to-unscopabl-467c3d.css",
+        "/build/vendors-node_modules_fortawesome_fontawesome-free_js_all_js-node_modules_fortawesome_fontawes-27c7a3.css",
+        "/build/app.css"
       ]
     },
     "game": {
       "js": [
-        "/build/runtime.6d1d3c17.js",
-        "/build/618.89ed990b.js",
-        "/build/645.b1890628.js",
-        "/build/game.2e52d3c7.js"
+        "/build/runtime.js",
+        "/build/vendors-node_modules_leaflet_dist_leaflet_css-node_modules_core-js_internals_add-to-unscopabl-467c3d.js",
+        "/build/vendors-node_modules_leaflet_dist_leaflet-src_js-node_modules_leaflet_dist_images_marker-icon-0aac6a.js",
+        "/build/game.js"
       ],
       "css": [
-        "/build/game.ca9241f3.css"
+        "/build/vendors-node_modules_leaflet_dist_leaflet_css-node_modules_core-js_internals_add-to-unscopabl-467c3d.css"
       ]
     }
   }

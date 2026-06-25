@@ -28,7 +28,7 @@ final class WorldStateService
         $visibleBuildings = $this->filterBuildings($player, $game, $allBuildings);
 
         // 3. TRANSFORM
-        $buildingData = $this->buildingTransformer->transform($visibleBuildings);
+        $buildingData = $this->buildingTransformer->transform($visibleBuildings, $player);
 
         // 4. PLAYERS
         $players = $this->buildPlayers($game, $player);
@@ -54,33 +54,22 @@ final class WorldStateService
             return $buildings;
         }
 
-        $base = $this->buildingRepository->findBaseForPlayer($player);
+        return array_filter(
+            $buildings,
+            function ($building) use ($player) {
 
-        $position = $base
-            ? $this->visionService->getPlayerPositionFromBase($base)
-            : null;
+                // Toujours voir ses propres bâtiments
+                if ($building->getPlayer()->getId() === $player->getId()) {
+                    return true;
+                }
 
-        if (!$position) {
-            return [];
-        }
-
-        $radius = $this->visionService->getPlayerVisionRadius($player);
-
-        return array_filter($buildings, function ($b) use ($player, $position, $radius) {
-
-            // always see own buildings
-            if ($b->getPlayer()->getId() === $player->getId()) {
-                return true;
+                return $this->visionService->canPlayerSeePosition(
+                    $player,
+                    $building->getLatitudeBuild(),
+                    $building->getLongitudeBuild()
+                );
             }
-
-            return $this->visionService->isInRange(
-                $position['lat'],
-                $position['lng'],
-                $b->getLatitudeBuild(),
-                $b->getLongitudeBuild(),
-                $radius
-            );
-        });
+        );
     }
 
     private function buildPlayers(Game $game, Player $currentPlayer): array
@@ -125,22 +114,19 @@ final class WorldStateService
     {
         $sources = [];
 
-        foreach ($game->getPlayers() as $p) {
-            $base = $this->buildingRepository->findBaseForPlayer($p);
+        foreach ($player->getBuildings() as $building) {
 
-            if (!$base) {
-                continue;
+            $radius = $building->getBuildingType()->getVisionRadius();
+
+            if ($radius <= 0) {
+                $radius = VisionService::BASE_VISION_RADIUS;
             }
 
-            $position = $this->visionService->getPlayerPositionFromBase($base);
-            $radius = $this->visionService->getPlayerVisionRadius($p);
-
-            // Toujours inclure sa propre base
             $sources[] = [
-                'lat' => $position['lat'],
-                'lng' => $position['lng'],
+                'lat' => $building->getLatitudeBuild(),
+                'lng' => $building->getLongitudeBuild(),
                 'radius' => $radius,
-                'isMe' => $p->getId() === $player->getId(),
+                'type' => $building->getBuildingType()->getCode(),
             ];
         }
 

@@ -40,4 +40,24 @@ final class VisionService
             'lng' => $base->getLongitudeBuild(),
         ];
     }
+
+    public function canPlayerSeePosition(Player $player, float $lat, float $lng): bool
+    {
+        foreach ($player->getBuildings() as $building) {
+
+            $radius = $building->getBuildingType()->getVisionRadius();
+
+            if ($this->isInRange(
+                $building->getLatitudeBuild(),
+                $building->getLongitudeBuild(),
+                $lat,
+                $lng,
+                $radius
+            )) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
