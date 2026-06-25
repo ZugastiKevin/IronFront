@@ -10,17 +10,10 @@ use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
 use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\CollectionField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
-use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 
 class PlayerInventoryCrudController extends AbstractCrudController
 {
     public const INDEX = 'index';
-
-    public function __construct(
-        private AdminUrlGenerator $adminUrlGenerator
-    ) {
-    }
 
     public static function getEntityFqcn(): string
     {
