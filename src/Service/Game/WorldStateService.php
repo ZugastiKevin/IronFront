@@ -33,13 +33,13 @@ final class WorldStateService
         // 4. PLAYERS
         $players = $this->buildPlayers($game, $player);
 
-        // 5. RESOURCES
-        $resources = $this->buildResources($player);
+        // 5. INVENTORIES
+        $inventories = $this->buildInventories($player);
 
         return [
             'buildings' => $buildingData,
             'players' => $players,
-            'resources' => $resources,
+            'inventories' => $inventories,
             'fogMode' => $game->getFogMode()?->value ?? FogMode::DISABLED->value,
         ];
     }
@@ -103,14 +103,14 @@ final class WorldStateService
         return $data;
     }
 
-    private function buildResources(Player $player): array
+    private function buildInventories(Player $player): array
     {
-        $resources = [];
+        $inventories = [];
 
         foreach ($player->getPlayerInventories() as $inv) {
-            $resources[$inv->getResourceType()->getCode()->value] = $inv->getQuantity();
+            $inventories[$inv->getResourceType()->getCode()->value] = $inv->getQuantity();
         }
 
-        return $resources;
+        return $inventories;
     }
 }
