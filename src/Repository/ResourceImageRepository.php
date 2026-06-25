@@ -3,13 +3,13 @@
 namespace App\Repository;
 
 use App\Entity\ResourceImage;
-use Doctrine\Bundle\DoctrineBundle\Repository\ServiceRepository;
+use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
- * @extends ServiceRepository<ResourceImage>
+ * @extends ServiceEntityRepository<ResourceImage>
  */
-class ResourceImageRepository extends ServiceRepository
+class ResourceImageRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
     {
