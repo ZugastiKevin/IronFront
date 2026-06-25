@@ -89,7 +89,7 @@ final class GameApiController extends AbstractController
                     'lat' => $baseBuilding?->getLatitudeBuild(),
                     'lng' => $baseBuilding?->getLongitudeBuild(),
                     'faction' => $playerFactions[$gamePlayer->getId()],
-                    'pseudo' => $user->getPseudo(),
+                    'pseudo' => $gamePlayer->getUser()->getPseudo(),
                     'isMe' => $gamePlayer->getUser()->getId() === $user->getId(),
                 ];
             }
