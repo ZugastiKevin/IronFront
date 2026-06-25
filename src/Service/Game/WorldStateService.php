@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service;
+namespace App\Service\Game;
 
 use App\Entity\Player;
 use App\Repository\BuildingRepository;
