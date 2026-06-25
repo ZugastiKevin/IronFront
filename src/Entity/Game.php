@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\FogMode;
 use App\Repository\GameRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -30,6 +31,9 @@ class Game
 
     #[ORM\Column]
     private ?bool $isActive = null;
+
+    #[ORM\Column(type: 'string', enumType: FogMode::class)]
+    private FogMode $fogMode = FogMode::ENABLED;
 
     /**
      * @var Collection<int, Player>
@@ -117,6 +121,25 @@ class Game
         $this->isActive = $isActive;
 
         return $this;
+    }
+
+    public function getFogMode(): FogMode
+    {
+        return $this->fogMode;
+    }
+
+    public function setFogMode(FogMode $mode): self
+    {
+        $this->fogMode = $mode;
+        return $this;
+    }
+
+    public function isFullVision(): bool
+    {
+        return in_array($this->fogMode, [
+            FogMode::DISABLED,
+            FogMode::DEBUG
+        ], true);
     }
 
     /**

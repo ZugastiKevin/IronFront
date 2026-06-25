@@ -17,6 +17,7 @@ enum BuildingCode: string
     case FACTORY_ALUMINUM_ALLOY = "factory_aluminum_alloy";
     case FACTORY_CIRCUIT_BOARD = "factory_circuit_board";
     case STOCKPILE = "stockpile";
+    case TOWER = "tower";
     
     
 
@@ -36,6 +37,7 @@ enum BuildingCode: string
             self::FACTORY_ALUMINUM_ALLOY => "Usine d'alliage d'aluminium",
             self::FACTORY_CIRCUIT_BOARD => "Usine de circuits imprimés",
             self::STOCKPILE => "Dépôt de réserve",
+            self::TOWER => "Tour de guet",
         };
     }
 }

@@ -7,6 +7,7 @@ use App\Entity\Player;
 use App\Entity\ResourceType;
 use App\Enum\BuildingCategory;
 use App\Enum\BuildingCode;
+use App\Service\Game\Vision\VisionService;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -15,9 +16,18 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 class BuildingRepository extends ServiceEntityRepository
 {
-    public function __construct(ManagerRegistry $registry)
+    public function __construct(ManagerRegistry $registry, private VisionService $visionService,)
     {
         parent::__construct($registry, Building::class);
+    }
+
+    public function findAllBuildings(): array
+    {
+        return $this->createQueryBuilder('b')
+            ->leftJoin('b.buildingType', 'bt')
+            ->addSelect('bt')
+            ->getQuery()
+            ->getResult();
     }
 
     public function findBaseForPlayer(Player $player): ?Building
@@ -37,9 +47,18 @@ class BuildingRepository extends ServiceEntityRepository
      * @param Player $player
      * @return array
      */
-    public function getBuildingsDataForPlayer(Player $player): array
+    public function getBuildingsData(?Player $player = null, bool $global = false): array
     {
-        $buildings = $this->findBy(['player' => $player]);
+        $qb = $this->createQueryBuilder('b')
+            ->leftJoin('b.buildingType', 'bt')
+            ->addSelect('bt');
+
+        if ($player !== null) {
+            $qb->where('b.player = :player')
+            ->setParameter('player', $player);
+        }
+
+        $buildings = $qb->getQuery()->getResult();
         $buildingData = [];
 
         foreach ($buildings as $b) {
@@ -58,13 +77,64 @@ class BuildingRepository extends ServiceEntityRepository
                 'code' => $buildingType->getCode(),
                 'level' => $level,
                 'ownerId' => $b->getPlayer()->getId(),
-                'production_rate' => $productionRate > 0 ? $production : null,
+                'production_rate' => $productionRate > 0 ? $productionRate : null,
                 'production' => $production > 0 ? $production : null,
                 'resource_type' => $resourceType,
             ];
         }
 
         return $buildingData;
+    }
+
+    /**
+     * Récupère les bâtiments visibles pour un joueur donné.
+     * @param Player $player
+     * @return array
+     */
+    public function getVisibleBuildings(Player $player): array
+    {
+        $allBuildings = $this->findAll();
+        $ownBuildings = $this->findBy(['player' => $player]);
+
+        $playerBase = $this->findBaseForPlayer($player);
+
+        if (!$playerBase) {
+            return [];
+        }
+
+        $pLat = $playerBase->getLatitudeBuild();
+        $pLng = $playerBase->getLongitudeBuild();
+
+        $visionBonus = 0.0;
+
+        foreach ($ownBuildings as $b) {
+            $visionBonus += $b->getBuildingType()->getVisionRadius();
+        }
+
+        $baseRange = $this->visionService->getPlayerVisionRadius($player);
+
+        $visible = [];
+
+        foreach ($allBuildings as $b) {
+
+            // toujours visible si à toi
+            if ($b->getPlayer()->getId() === $player->getId()) {
+                $visible[] = $b;
+                continue;
+            }
+
+            if ($this->visionService->isInRange(
+                $pLat,
+                $pLng,
+                $b->getLatitudeBuild(),
+                $b->getLongitudeBuild(),
+                $baseRange
+            )) {
+                $visible[] = $b;
+            }
+        }
+
+        return $visible;
     }
 
     /**

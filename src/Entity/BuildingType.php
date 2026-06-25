@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Enum\BuildingCategory;
+use App\Enum\BuildingCode;
 use App\Repository\BuildingTypeRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -218,6 +219,15 @@ class BuildingType
             }
         }
         return $this;
+    }
+
+    public function getVisionRadius(): float
+    {
+        return match ($this->getCode()) {
+            BuildingCode::BASE => 0.03,
+            BuildingCode::TOWER => 0.05,
+            default => 0.0,
+        };
     }
 
     public function isProduction(): bool

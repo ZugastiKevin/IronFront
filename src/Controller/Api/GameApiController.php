@@ -4,7 +4,6 @@ namespace App\Controller\Api;
 
 use App\Entity\Building;
 use App\Entity\BuildingType;
-use App\Entity\Delivery;
 use App\Entity\Game;
 use App\Entity\GameResourceDeposit;
 use App\Entity\Player;
@@ -12,6 +11,7 @@ use App\Entity\PlayerInventory;
 use App\Entity\ResourceDeposit;
 use App\Entity\ResourceType;
 use App\Entity\User;
+use App\Enum\FogMode;
 use App\Repository\BuildingRepository;
 use App\Repository\BuildingTypeRepository;
 use App\Repository\ChunkRepository;
@@ -25,6 +25,7 @@ use App\Service\Game\Building\EnemyBaseService;
 use App\Service\Game\CurrentPlayer;
 use App\Service\Game\Generate\GenerateChunkService;
 use App\Service\Game\Road\RoadService;
+use App\Service\WorldStateService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -52,88 +53,16 @@ final class GameApiController extends AbstractController
     // WORLD STATE
     // -------------------------
     #[Route('/api/world-state', name: 'api_world_state', methods: ['GET'])]
-    public function worldState(
-        BuildingRepository $buildingRepo,
-        CurrentPlayer $currentPlayer,
-    ): JsonResponse {
-        $user = $this->getUser();
-
-        if (!$user instanceof User) {
-            return $this->json([], 401);
-        }
-
+    public function worldState(WorldStateService $worldState, CurrentPlayer $currentPlayer): JsonResponse {
         $player = $currentPlayer->get();
 
         if (!$player) {
-            return $this->json(['error' => 'No active game session'], 401);
+            return $this->json(['error' => 'No session'], 401);
         }
 
-        $game = $player->getGame();
-
-        if (!$game) {
-            return $this->json([]);
-        }
-
-        // Créer une map des factions des joueurs
-        $playerFactions = [];
-        $dataPlayers = [];
-
-        foreach ($game->getPlayers() as $gamePlayer) {
-            $playerFactions[$gamePlayer->getId()] = strtolower($gamePlayer->getFaction()?->getCode() ?? 'default');
-
-            $baseBuilding = $buildingRepo->findBaseForPlayer($gamePlayer);
-
-            // Toujours inclure le joueur (même sans base)
-            if ($gamePlayer->getUser()->getId() === $user->getId() || $baseBuilding) {
-                $dataPlayers[] = [
-                    'lat' => $baseBuilding?->getLatitudeBuild(),
-                    'lng' => $baseBuilding?->getLongitudeBuild(),
-                    'faction' => $playerFactions[$gamePlayer->getId()],
-                    'pseudo' => $gamePlayer->getUser()->getPseudo(),
-                    'isMe' => $gamePlayer->getUser()->getId() === $user->getId(),
-                ];
-            }
-        }
-
-        $buildingData = $buildingRepo->getBuildingsDataForPlayer($player);
-
-        // Ajouter la faction à chaque bâtiment
-        foreach ($buildingData as &$building) {
-            $building['faction'] = $playerFactions[$building['ownerId']] ?? 'default';
-        }
-
-        // Ajouter l'ID du joueur actif dans la réponse
-        $currentPlayerId = null;
-        foreach ($dataPlayers as $dataPlayer) {
-            if ($dataPlayer['isMe']) {
-                $currentPlayerId = $user->getId();
-                break;
-            }
-        }
-
-        $resources = [];
-        foreach ($player->getPlayerInventories() as $inv) {
-            $resources[$inv->getResourceType()->getCode()->value] = $inv->getQuantity();
-        }
-
-        $updatedAt = null;
-        $inventories = $player->getPlayerInventories();
-        if ($inventories && count($inventories) > 0) {
-            $firstInventory = $inventories->first();
-            if ($firstInventory instanceof PlayerInventory) {
-                $updatedAt = $firstInventory->getUpdatedAt();
-            }
-        }
-
-        $response = $this->json([
-            'buildings' => $buildingData,
-            'players' => $dataPlayers,
-            'resources' => $resources,
-            'updatedAt' => $updatedAt?->format('c'),
-            'currentPlayerId' => $currentPlayerId,
-        ]);
-
-        return $response;
+        return $this->json(
+            $worldState->build($player)
+        );
     }
 
     // -------------------------
