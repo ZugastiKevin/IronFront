@@ -8,6 +8,7 @@ import { loadBaseFromServer, loadOtherBase, setCurrentPlayerFaction } from '../b
 import { loadBuildingsFromData, setCurrentPlayerId } from '../buildings/building.js';
 
 import { initDepositLayers, depositLayers } from './deposits/deposits.js';
+import { initFogOfWar } from './fogOfWar.js';
 
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -148,6 +149,11 @@ export function loadWorld() {
 
             // Charger les bâtiments après avoir défini la faction du joueur
             loadBuildingsFromData(data.buildings);
+
+            // Initialiser le Fog of War
+            if (data.fogMode && data.visionSources) {
+                initFogOfWar(data.fogMode, data.visionSources, mapInstance);
+            }
         })
         .catch(err => {
             debugError('map', "Erreur load world", err);

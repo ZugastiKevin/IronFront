@@ -1,13 +1,13 @@
 {
-  "build/app.css": "/build/app.css",
-  "build/app.js": "/build/app.js",
-  "build/game.js": "/build/game.js",
-  "build/runtime.js": "/build/runtime.js",
-  "build/vendors-node_modules_leaflet_dist_leaflet_css-node_modules_core-js_internals_add-to-unscopabl-de41ae.css": "/build/vendors-node_modules_leaflet_dist_leaflet_css-node_modules_core-js_internals_add-to-unscopabl-de41ae.css",
-  "build/vendors-node_modules_leaflet_dist_leaflet_css-node_modules_core-js_internals_add-to-unscopabl-de41ae.js": "/build/vendors-node_modules_leaflet_dist_leaflet_css-node_modules_core-js_internals_add-to-unscopabl-de41ae.js",
-  "build/vendors-node_modules_leaflet_dist_leaflet-src_js-node_modules_leaflet_dist_images_marker-icon-ce41c2.js": "/build/vendors-node_modules_leaflet_dist_leaflet-src_js-node_modules_leaflet_dist_images_marker-icon-ce41c2.js",
-  "build/vendors-node_modules_fortawesome_fontawesome-free_js_all_js-node_modules_fortawesome_fontawes-6d35c4.css": "/build/vendors-node_modules_fortawesome_fontawesome-free_js_all_js-node_modules_fortawesome_fontawes-6d35c4.css",
-  "build/vendors-node_modules_fortawesome_fontawesome-free_js_all_js-node_modules_fortawesome_fontawes-6d35c4.js": "/build/vendors-node_modules_fortawesome_fontawesome-free_js_all_js-node_modules_fortawesome_fontawes-6d35c4.js",
+  "build/app.css": "/build/app.8dbb7998.css",
+  "build/app.js": "/build/app.c4e4afc1.js",
+  "build/game.css": "/build/game.ca9241f3.css",
+  "build/game.js": "/build/game.2e52d3c7.js",
+  "build/runtime.js": "/build/runtime.6d1d3c17.js",
+  "build/618.89ed990b.js": "/build/618.89ed990b.js",
+  "build/645.b1890628.js": "/build/645.b1890628.js",
+  "build/135.d29b3d5b.css": "/build/135.d29b3d5b.css",
+  "build/135.31888e33.js": "/build/135.31888e33.js",
   "build/images/empire.png": "/build/images/empire.c6b6ea9c.png",
   "build/fonts/fa-solid-900.woff2": "/build/fonts/fa-solid-900.ce9a3fa7.woff2",
   "build/fonts/fa-brands-400.woff2": "/build/fonts/fa-brands-400.f276979f.woff2",
@@ -17,6 +17,5 @@
   "build/images/marker-icon.png": "/build/images/marker-icon.2b3e1faf.png",
   "build/images/layers-2x.png": "/build/images/layers-2x.8f2c4d11.png",
   "build/images/layers.png": "/build/images/layers.416d9136.png",
-  "build/images/marker-shadow.png": "/build/images/marker-shadow.a0c6cc14.png",
-  "build/vendors-node_modules_leaflet_dist_leaflet-src_js-node_modules_leaflet_dist_images_marker-icon-dc7362.js": "/build/vendors-node_modules_leaflet_dist_leaflet-src_js-node_modules_leaflet_dist_images_marker-icon-dc7362.js"
+  "build/images/marker-shadow.png": "/build/images/marker-shadow.a0c6cc14.png"
 }

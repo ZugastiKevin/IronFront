@@ -36,11 +36,15 @@ final class WorldStateService
         // 5. INVENTORIES
         $inventories = $this->buildInventories($player);
 
+        // 6. VISION SOURCES
+        $visionSources = $this->buildVisionSources($player, $game);
+
         return [
             'buildings' => $buildingData,
             'players' => $players,
             'inventories' => $inventories,
             'fogMode' => $game->getFogMode()?->value ?? FogMode::DISABLED->value,
+            'visionSources' => $visionSources,
         ];
     }
 
@@ -112,5 +116,34 @@ final class WorldStateService
         }
 
         return $inventories;
+    }
+
+    /**
+     * Construit les sources de vision (base + bâtiments améliorés)
+     */
+    private function buildVisionSources(Player $player, Game $game): array
+    {
+        $sources = [];
+
+        foreach ($game->getPlayers() as $p) {
+            $base = $this->buildingRepository->findBaseForPlayer($p);
+
+            if (!$base) {
+                continue;
+            }
+
+            $position = $this->visionService->getPlayerPositionFromBase($base);
+            $radius = $this->visionService->getPlayerVisionRadius($p);
+
+            // Toujours inclure sa propre base
+            $sources[] = [
+                'lat' => $position['lat'],
+                'lng' => $position['lng'],
+                'radius' => $radius,
+                'isMe' => $p->getId() === $player->getId(),
+            ];
+        }
+
+        return $sources;
     }
 }
