@@ -2,7 +2,9 @@
 
 namespace App\Service\Game;
 
+use App\Entity\Game;
 use App\Entity\Player;
+use App\Enum\FogMode;
 use App\Repository\BuildingRepository;
 use App\Service\Game\Building\BuildingTransformer;
 use App\Service\Game\Vision\VisionService;
@@ -38,11 +40,11 @@ final class WorldStateService
             'buildings' => $buildingData,
             'players' => $players,
             'resources' => $resources,
-            'fogMode' => $game->getFogMode()->value,
+            'fogMode' => $game->getFogMode()?->value ?? FogMode::DISABLED->value,
         ];
     }
 
-    private function filterBuildings(Player $player, $game, array $buildings): array
+    private function filterBuildings(Player $player, Game $game, array $buildings): array
     {
         if ($game->isFullVision()) {
             return $buildings;
@@ -77,13 +79,13 @@ final class WorldStateService
         });
     }
 
-    private function buildPlayers($game, Player $currentPlayer): array
+    private function buildPlayers(Game $game, Player $currentPlayer): array
     {
         $data = [];
 
         foreach ($game->getPlayers() as $p) {
 
-            $base = $p->getBaseBuilding();
+            $base = $this->buildingRepository->findBaseForPlayer($p);
 
             if (!$base) {
                 continue;
