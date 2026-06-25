@@ -7,6 +7,7 @@ use App\Controller\Admin\BuildingTypeCrudController;
 use App\Controller\Admin\FactionBuildingImageCrudController;
 use App\Controller\Admin\GameCrudController;
 use App\Controller\Admin\PlayerInventoryCrudController;
+use App\Controller\Admin\ResourceImageCrudController;
 use App\Controller\Admin\UserCrudController;
 use EasyCorp\Bundle\EasyAdminBundle\Attribute\AdminDashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Dashboard;
@@ -47,6 +48,7 @@ class DashboardController extends AbstractDashboardController
         yield MenuItem::linkTo(FactionCrudController::class, 'Gestion des factions', 'fas fa-shield')->setAction(FactionCrudController::INDEX);
         yield MenuItem::linkTo(BuildingTypeCrudController::class, 'Gestion des types de bâtiments', 'fas fa-layer-group')->setAction(BuildingTypeCrudController::INDEX);
         yield MenuItem::linkTo(ResourceTypeCrudController::class, 'Gestion des types de ressources', 'fas fa-gem')->setAction(ResourceTypeCrudController::INDEX);
-        yield MenuItem::linkTo(FactionBuildingImageCrudController::class, 'Gestion des images', 'fas fa-image')->setAction(FactionBuildingImageCrudController::INDEX);
+        yield MenuItem::linkTo(FactionBuildingImageCrudController::class, 'Gestion des images de bâtiments', 'fas fa-image')->setAction(FactionBuildingImageCrudController::INDEX);
+        yield MenuItem::linkTo(ResourceImageCrudController::class, 'Gestion des images de ressources', 'fas fa-gem')->setAction(ResourceImageCrudController::INDEX);
     }
 }

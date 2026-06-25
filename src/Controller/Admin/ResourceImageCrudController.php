@@ -2,7 +2,8 @@
 
 namespace App\Controller\Admin;
 
-use App\Entity\FactionBuildingImage;
+use App\Entity\ResourceImage;
+use App\Entity\ResourceType;
 use Doctrine\ORM\EntityManagerInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
 use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
@@ -15,11 +16,11 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\String\Slugger\SluggerInterface;
 use Imagine\Image\ImagineInterface;
 
-class FactionBuildingImageCrudController extends AbstractCrudController
+class ResourceImageCrudController extends AbstractCrudController
 {
     public const INDEX = 'index';
-    public const BASE_PATH = 'assets/images/buildings';
-    public const PUBLIC_DIR = 'assets/images/buildings';
+    public const BASE_PATH = 'assets/images/resources';
+    public const PUBLIC_DIR = 'assets/images/resources';
 
     public function __construct(
         private SluggerInterface $slugger,
@@ -29,15 +30,15 @@ class FactionBuildingImageCrudController extends AbstractCrudController
 
     public static function getEntityFqcn(): string
     {
-        return FactionBuildingImage::class;
+        return ResourceImage::class;
     }
 
     public function configureCrud(Crud $crud): Crud
     {
         return $crud
-            ->setEntityLabelInSingular('Image de bâtiment')
-            ->setEntityLabelInPlural('Images de bâtiments')
-            ->setPageTitle(Crud::PAGE_INDEX, 'Gestion des images de bâtiments');
+            ->setEntityLabelInSingular('Image de ressource')
+            ->setEntityLabelInPlural('Images de ressources')
+            ->setPageTitle(Crud::PAGE_INDEX, 'Gestion des images de ressources');
     }
 
     public function configureFields(string $pageName): iterable
@@ -45,11 +46,8 @@ class FactionBuildingImageCrudController extends AbstractCrudController
         return [
             IdField::new('id')->onlyOnIndex(),
 
-            AssociationField::new('faction')
-                ->setLabel('Faction'),
-
-            AssociationField::new('buildingType')
-                ->setLabel('Type de bâtiment'),
+            AssociationField::new('resourceType')
+                ->setLabel('Type de ressource'),
 
             Field::new('imageFile')
                 ->setLabel('Image')
@@ -76,7 +74,7 @@ class FactionBuildingImageCrudController extends AbstractCrudController
         parent::updateEntity($entityManager, $entityInstance);
     }
 
-    private function handleImageUpload(FactionBuildingImage $entity): void
+    private function handleImageUpload(ResourceImage $entity): void
     {
         $imageFile = $entity->getImageFile();
 
@@ -84,42 +82,28 @@ class FactionBuildingImageCrudController extends AbstractCrudController
             return;
         }
 
-        $faction = $entity->getFaction();
-        $buildingType = $entity->getBuildingType();
+        $resourceType = $entity->getResourceType();
 
-        if (!$faction || !$buildingType) {
+        if (!$resourceType) {
             return;
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Nom dossier faction
+        | Nom fichier ressource
         |--------------------------------------------------------------------------
         */
 
-        $factionFolder = $this->slugger
-            ->slug($faction->getCode())
-            ->lower()
-            ->toString();
+        $resourceName = strtolower($resourceType->getCode()->value);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Nom fichier bâtiment
-        |--------------------------------------------------------------------------
-        */
-
-        $buildingName = strtolower($buildingType->getCode());
-
-        $filename = match ($buildingName) {
-            default => str_replace(
-                '-',
-                '_',
-                $this->slugger
-                    ->slug($buildingName)
-                    ->lower()
-                    ->toString()
-            ),
-        };
+        $filename = str_replace(
+            '-',
+            '_',
+            $this->slugger
+                ->slug($resourceName)
+                ->lower()
+                ->toString()
+        );
 
         $extension = $imageFile->guessExtension() ?: 'png';
 
@@ -132,10 +116,9 @@ class FactionBuildingImageCrudController extends AbstractCrudController
         */
 
         $targetDirectory = sprintf(
-            '%s/%s/%s',
+            '%s/%s',
             $this->getParameter('kernel.project_dir'),
-            'public/' . self::PUBLIC_DIR,
-            $factionFolder
+            'public/' . self::PUBLIC_DIR
         );
 
         /*
@@ -190,9 +173,7 @@ class FactionBuildingImageCrudController extends AbstractCrudController
         |--------------------------------------------------------------------------
         */
 
-        $entity->setImagePath(
-            $factionFolder . '/' . $newFilename
-        );
+        $entity->setImagePath($newFilename);
     }
 
     private function compressImage(

@@ -2,8 +2,11 @@
 
 namespace App\Entity;
 
+use App\Entity\ResourceImage;
 use App\Enum\ResourceCode;
 use App\Repository\ResourceTypeRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: ResourceTypeRepository::class)]
@@ -25,6 +28,17 @@ class ResourceType
 
     #[ORM\Column]
     private int $rarity = 0;
+
+    /**
+     * @var Collection<int, ResourceImage>
+     */
+    #[ORM\OneToMany(targetEntity: ResourceImage::class, mappedBy: 'resourceType', orphanRemoval: true)]
+    private Collection $resourceImages;
+
+    public function __construct()
+    {
+        $this->resourceImages = new ArrayCollection();
+    }
 
     public function getId(): ?int
     {
@@ -75,6 +89,35 @@ class ResourceType
     public function setRarity(int $rarity): static
     {
         $this->rarity = $rarity;
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, ResourceImage>
+     */
+    public function getResourceImages(): Collection
+    {
+        return $this->resourceImages;
+    }
+
+    public function addResourceImage(ResourceImage $resourceImage): static
+    {
+        if (!$this->resourceImages->contains($resourceImage)) {
+            $this->resourceImages->add($resourceImage);
+            $resourceImage->setResourceType($this);
+        }
+
+        return $this;
+    }
+
+    public function removeResourceImage(ResourceImage $resourceImage): static
+    {
+        if ($this->resourceImages->removeElement($resourceImage)) {
+            if ($resourceImage->getResourceType() === $this) {
+                $resourceImage->setResourceType(null);
+            }
+        }
+
         return $this;
     }
 }
