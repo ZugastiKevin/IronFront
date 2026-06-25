@@ -48,7 +48,11 @@ final class WorldStateService
             return $buildings;
         }
 
-        $position = $this->visionService->getPlayerPosition($player);
+        $base = $this->buildingRepository->findBaseForPlayer($player);
+
+        $position = $base
+            ? $this->visionService->getPlayerPositionFromBase($base)
+            : null;
 
         if (!$position) {
             return [];

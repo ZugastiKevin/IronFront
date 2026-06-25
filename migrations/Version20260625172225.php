@@ -10,7 +10,7 @@ use Doctrine\Migrations\AbstractMigration;
 /**
  * Auto-generated Migration: Please modify to your needs!
  */
-final class Version20260625095058 extends AbstractMigration
+final class Version20260625172225 extends AbstractMigration
 {
     public function getDescription(): string
     {
@@ -20,14 +20,14 @@ final class Version20260625095058 extends AbstractMigration
     public function up(Schema $schema): void
     {
         // this up() migration is auto-generated, please modify it to your needs
-        $this->addSql('CREATE TABLE IF NOT EXISTS resource_image (id INT AUTO_INCREMENT NOT NULL, image_path VARCHAR(191) NOT NULL, resource_type_id INT NOT NULL, INDEX IDX_EE867E6D98EC6B7B (resource_type_id), PRIMARY KEY (id)) DEFAULT CHARACTER SET utf8mb4');
+        $this->addSql('ALTER TABLE game ADD fog_mode VARCHAR(255) NOT NULL');
         $this->addSql('ALTER TABLE resource_image ADD CONSTRAINT FK_EE867E6D98EC6B7B FOREIGN KEY (resource_type_id) REFERENCES resource_type (id)');
     }
 
     public function down(Schema $schema): void
     {
         // this down() migration is auto-generated, please modify it to your needs
+        $this->addSql('ALTER TABLE game DROP fog_mode');
         $this->addSql('ALTER TABLE resource_image DROP FOREIGN KEY FK_EE867E6D98EC6B7B');
-        $this->addSql('DROP TABLE IF EXISTS resource_image');
     }
 }

@@ -4,14 +4,9 @@ namespace App\Service\Game\Vision;
 
 use App\Entity\Building;
 use App\Entity\Player;
-use App\Repository\BuildingRepository;
 
 final class VisionService
 {
-    public function __construct(
-        private BuildingRepository $buildingRepository
-    ) {}
-    
     public const BASE_VISION_RADIUS = 0.02;
 
     public function isInRange(
@@ -36,13 +31,6 @@ final class VisionService
         }
 
         return $radius;
-    }
-
-    public function getPlayerPosition(Player $player): ?array
-    {
-        $base = $this->buildingRepository->findBaseForPlayer($player);
-
-        return $base ? $this->getPlayerPositionFromBase($base) : null;
     }
 
     public function getPlayerPositionFromBase(Building $base): array
