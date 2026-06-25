@@ -20,12 +20,12 @@ final class Version20260625172225 extends AbstractMigration
     public function up(Schema $schema): void
     {
         // this up() migration is auto-generated, please modify it to your needs
-        $this->addSql('ALTER TABLE game ADD fog_mode VARCHAR(255) NOT NULL');
+        $this->addSql('ALTER TABLE IF EXISTS game ADD fog_mode VARCHAR(255) NOT NULL');
     }
 
     public function down(Schema $schema): void
     {
         // this down() migration is auto-generated, please modify it to your needs
-        $this->addSql('ALTER TABLE game DROP fog_mode');
+        $this->addSql('ALTER TABLE IF EXISTS game DROP fog_mode');
     }
 }
