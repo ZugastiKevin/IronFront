@@ -7,61 +7,41 @@
         <div class="home container">
             <h1>{{ site_name }}</h1>
 
-            <div class="task-table-container">
-                <table class="task-table">
-                    <thead>
-                        <tr>
-                            <th>Tâche</th>
-                            <th>Description</th>
-                            <th>Statut</th>
-                            <th>Priorité</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Créer les templates Twig</td>
-                            <td>Développer les vues pour la page d'accueil et les formulaires</td>
-                            <td><span class="status status-completed">Terminé</span></td>
-                            <td><span class="priority priority-medium">Moyenne</span></td>
-                        </tr>
-                        <tr>
-                            <td>Configurer la base de données</td>
-                            <td>user / game / faction / building and sub / resource and sub / chunk / road / delivery</td>
-                            <td><span class="status status-completed">Terminé</span></td>
-                            <td><span class="priority priority-medium">Moyenne</span></td>
-                        </tr>
-                        <tr>
-                            <td>Mettre en place les tests</td>
-                            <td>Créer une suite de tests unitaires et fonctionnels</td>
-                            <td><span class="status status-completed">Terminé</span></td>
-                            <td><span class="priority priority-low">Faible</span></td>
-                        </tr>
-                        <tr>
-                            <td>Configurer le projet Symfony</td>
-                            <td>Mettre en place les bundles et les configurations de base</td>
-                            <td><span class="status status-completed">Terminé</span></td>
-                            <td><span class="priority priority-high">Élevée</span></td>
-                        </tr>
-                        <tr>
-                            <td>Intégrer HTMX</td>
-                            <td>Ajouter les interactions dynamiques sans JavaScript</td>
-                            <td><span class="status status-completed">Terminé</span></td>
-                            <td><span class="priority priority-high">Élevée</span></td>
-                        </tr>
-                        <tr>
-                            <td>Développer les CRUD controllers</td>
-                            <td>ResourceImage, Faction, ResourceType, Building, BuildingType, Game, PlayerInventory</td>
-                            <td><span class="status status-completed">Terminé</span></td>
-                            <td><span class="priority priority-high">Élevée</span></td>
-                        </tr>
-                        <tr>
-                            <td>Implémenter les commandes de monde</td>
-                            <td>WorldExpansionCommand, production processing, chunk generation</td>
-                            <td><span class="status status-completed">Terminé</span></td>
-                            <td><span class="priority priority-medium">Moyenne</span></td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div class="player-features">
+                <h2>Fonctionnalités du jeu</h2>
+
+                <div class="feature-section">
+                    <h3>🎮 Actions du joueur (Frontend)</h3>
+                    <ul>
+                        <li>Construire et améliorer des bâtiments (cliquez pour confirmer), (exploiter un gisement de ressources, base)</li>
+                        <li>Choisir sa faction au début de la partie et la partie</li>
+                        <li>Consulter son inventaire de ressources (dans la barre de navigation sous forme d'icônes / montant de la ressource)</li>
+                        <li>Suivre les livraisons en cours (visuelles du camion), (voir les détails pour les livraisons sur les batiment de production, exemple: mine de fer)</li>
+                        <li>Recevoir des notifications (HTMX en temps réel)</li>
+                    </ul>
+                </div>
+
+                <div class="feature-section">
+                    <h3>⚙️ Système automatique (Backend)</h3>
+                    <ul>
+                        <li>✓ Vérification des ressources disponibles avant construction</li>
+                        <li>✓ Consommation automatique des ressources à la construction</li>
+                        <li>✓ Production continue des ressources par les bâtiments</li>
+                        <li>✓ Livraison automatique des ressources entre bâtiments</li>
+                        <li>✓ Expansion du monde (nouveaux chunks/routes générés)</li>
+                        <li>✓ Calcul des coûts exponentiels pour les améliorations</li>
+                    </ul>
+                </div>
+
+                <div class="feature-section">
+                    <h3>🏗️ Architecture du jeu</h3>
+                    <ul>
+                        <li>Système de chunks géographiques (carte divisée en zones)</li>
+                        <li>Routes générées automatiquement pour les livraisons</li>
+                        <li>17 entités : User, Player, Game, Building, Faction, Resource...</li>
+                        <li>20+ services métiers (BuildingService, RoadService, etc.)</li>
+                    </ul>
+                </div>
             </div>
 
             <div id="notifications"
