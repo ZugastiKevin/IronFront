@@ -5,14 +5,26 @@ import { invalidateChunk } from './invalidateChunk.js';
 import { debugLog, debugWarn, debugError } from '../../../utils/debug.js';
 import { roadsState } from './roadsState.js';
 import { renderDepositsFromData } from '../deposits/deposits.js';
-import { getCacheKey } from '../../../utils/cacheUtils.js';
 
 // ==========================
-// LOAD CONTROL
+// CACHE EN MÉMOIRE
 // ==========================
-const loadingQueue = new Set();
-const MAX_CONCURRENT = 4;
-let activeRequests = 0;
+const chunkCache = new Map();
+const CACHE_TTL  = 3600000; // 1h
+
+function getCachedChunk(chunkId) {
+    const cached = chunkCache.get(chunkId);
+    if (!cached) return null;
+    if (Date.now() - cached.ts > CACHE_TTL) {
+        chunkCache.delete(chunkId);
+        return null;
+    }
+    return cached;
+}
+
+function setCachedChunk(chunkId, data) {
+    chunkCache.set(chunkId, { ...data, ts: Date.now() });
+}
 
 // ==========================
 // CHUNK ID
@@ -27,71 +39,44 @@ function getChunkId(lat, lng) {
 // MAIN LOAD VISIBLE
 // ==========================
 export async function loadVisibleRoadChunks() {
-
     const map = getMap();
-
     if (!map || map.getZoom() < 14) return;
 
-    const bounds = map.getBounds();
-
+    const bounds        = map.getBounds();
     const visibleChunks = getVisibleChunks(bounds);
+    const chunksToLoad  = visibleChunks.filter(chunkId => !roadsState.loadedChunks.has(chunkId));
 
-    const chunksToLoad = visibleChunks.filter(
-        chunkId => !roadsState.loadedChunks.has(chunkId)
-    );
-
-    // ==========================
-    // VERIFICATION CACHE LOCAL
-    // ==========================
     const finalChunksToLoad = [];
 
     for (const chunkId of chunksToLoad) {
-        const cacheKey = getCacheKey(chunkId);
-        const cached = localStorage.getItem(cacheKey);
-        if (cached) {
-            const data = JSON.parse(cached);
-            // Vérifier si le cache est vieux (ex: plus de 1h)
-            if (Date.now() - data.ts < 3600000) { 
-                roadsState.chunks[chunkId] = {
-                    status: data.hasRoads ? 'loaded' : 'empty',
-                    roads: data.roads,
-                    buildings: data.buildings,
-                    deposits: data.deposits,
-                    hasRoads: data.hasRoads
-                };
-                roadsState.loadedChunks.add(chunkId);
-                setChunkColor(chunkId, data.hasRoads ? 'blue' : '#444');
-                renderDepositsFromData(data.deposits || [], map);
-                continue;
-            }
+        const data = getCachedChunk(chunkId);
+        if (data) {
+            roadsState.chunks[chunkId] = {
+                status:   data.hasRoads ? 'loaded' : 'empty',
+                roads:    data.roads,
+                buildings: data.buildings,
+                deposits: data.deposits,
+                hasRoads: data.hasRoads
+            };
+            roadsState.loadedChunks.add(chunkId);
+            setChunkColor(chunkId, data.hasRoads ? 'blue' : '#444');
+            renderDepositsFromData(data.deposits || [], map);
+            continue;
         }
         finalChunksToLoad.push(chunkId);
     }
 
-    // ==========================
-    // ETAT LOADING
-    // ==========================
-
     for (const chunkId of finalChunksToLoad) {
-
-        roadsState.chunks[chunkId] = {
-            status: 'loading',
-            roads: [],
-            buildings: [],
-            deposits: []
-        };
-
+        roadsState.chunks[chunkId] = { status: 'loading', roads: [], buildings: [], deposits: [] };
         setChunkColor(chunkId, 'orange');
     }
 
-    // rien à charger
     if (finalChunksToLoad.length === 0) {
         refreshChunkColors(visibleChunks);
         return;
     }
 
     try {
-
         const [roadsResponse, buildingsResponse, depositsResponse] = await Promise.all([
             fetch('/api/chunks/bulk', {
                 method: 'POST',
@@ -110,159 +95,47 @@ export async function loadVisibleRoadChunks() {
             })
         ]);
 
-        if (!roadsResponse.ok || !buildingsResponse.ok || !depositsResponse.ok) throw new Error("API error");
+        if (!roadsResponse.ok || !buildingsResponse.ok || !depositsResponse.ok) {
+            throw new Error("API error");
+        }
 
-        const roadsData = await roadsResponse.json();
+        const roadsData     = await roadsResponse.json();
         const buildingsData = await buildingsResponse.json();
-        const depositsData = await depositsResponse.json();
-
-        // Créer un index pour mapper les bâtiments par chunkId rapidement
-        const buildingsByChunk = {};
-        buildingsData.forEach(b => {
-            const cId = Math.floor(b.lat * 100) + '_' + Math.floor(b.lng * 100);
-            if (!buildingsByChunk[cId]) buildingsByChunk[cId] = [];
-            buildingsByChunk[cId].push(b);
-        });
-
-        // ==========================
-        // TRAITEMENT CHUNKS
-        // ==========================
+        const depositsData  = await depositsResponse.json();
 
         for (const chunkId of finalChunksToLoad) {
             const chunkData = {
-                roads: roadsData[chunkId]?.roads || [],
+                roads:     roadsData[chunkId]?.roads     || [],
                 buildings: buildingsData[chunkId]?.buildings || [],
-                deposits: depositsData[chunkId] || []
+                deposits:  depositsData[chunkId] || []
             };
 
-            const hasRoads = chunkData.roads && chunkData.roads.length > 0;
+            const hasRoads = chunkData.roads.length > 0;
 
             roadsState.chunks[chunkId] = {
                 status: hasRoads ? 'loaded' : 'empty',
-                roads: chunkData.roads || [],
-                buildings: chunkData.buildings || [],
-                deposits: chunkData.deposits || [],
+                ...chunkData,
                 hasRoads
             };
 
             roadsState.loadedChunks.add(chunkId);
+            setCachedChunk(chunkId, { ...chunkData, hasRoads });
 
-            // ==========================
-            // CACHE
-            // ==========================
-            const cacheKey = getCacheKey(chunkId);
-            localStorage.setItem(
-            cacheKey,
-            JSON.stringify({
-                roads: chunkData.roads || [],
-                buildings: chunkData.buildings || [],
-                deposits: chunkData.deposits || [],
-                hasRoads,
-                ts: Date.now()
-            }));
-
-            // ==========================
-            // DRAW ROADS
-            // ==========================
-
-            // chunkData.roads.forEach(road => {
-            //     drawRoad(road);
-            // });
-
-            // ==========================
-            // DRAW BUILDINGS
-            // ==========================
-            // chunkData.buildings.forEach(building => {
-            //     drawBuilding(building);
-            // });
-
-            // ==========================
-            // COULEUR CHUNK
-            // ==========================
-            setChunkColor(
-                chunkId,
-                hasRoads ? 'blue' : '#444'
-            );
-
+            setChunkColor(chunkId, hasRoads ? 'blue' : '#444');
             renderDepositsFromData(chunkData.deposits, map);
 
-            debugLog("roads", `Chunk ${chunkId} loaded (${chunkData.roads.length} roads, ${chunkData.buildings.length} buildings, ${chunkData.deposits.length} deposits)`);
+            debugLog("roads", `Chunk ${chunkId} chargé (${chunkData.roads.length} routes, ${chunkData.deposits.length} dépôts)`);
         }
+
     } catch (error) {
-
         debugError("roads", "Erreur chargement chunks bulk:", error);
-
-        // ==========================
-        // ETAT ERREUR
-        // ==========================
-
         for (const chunkId of finalChunksToLoad) {
-            roadsState.chunks[chunkId] = {
-
-                status: 'error',
-
-                roads: [],
-
-                buildings: [],
-                deposits: []
-            };
-
+            roadsState.chunks[chunkId] = { status: 'error', roads: [], buildings: [], deposits: [] };
             setChunkColor(chunkId, 'red');
         }
     }
 
-    // ==========================
-    // REFRESH VISUEL FINAL
-    // ==========================
-
     refreshChunkColors(visibleChunks);
-}
-
-// ==========================
-// REFRESH CHUNK COLORS
-// ==========================
-function refreshChunkColors(visibleChunks) {
-
-    for (const chunkId of visibleChunks) {
-
-        const chunk = roadsState.chunks[chunkId];
-        if (!chunk) {
-
-            setChunkColor(chunkId, 'orange');
-            continue;
-        }
-
-        switch (chunk.status) {
-
-            case 'loaded':
-
-                setChunkColor(chunkId, 'blue');
-
-                break;
-
-            case 'empty':
-
-                setChunkColor(chunkId, '#444');
-
-                break;
-
-            case 'loading':
-
-                setChunkColor(chunkId, 'orange');
-
-                break;
-
-            case 'error':
-
-                setChunkColor(chunkId, 'red');
-
-                break;
-
-            default:
-
-                setChunkColor(chunkId, 'yellow');
-        }
-    }
 }
 
 // ==========================
@@ -270,11 +143,9 @@ function refreshChunkColors(visibleChunks) {
 // ==========================
 export async function refreshChunk(lat, lng) {
     const chunkId = getChunkId(lat, lng);
-
     invalidateChunk(chunkId);
-
+    chunkCache.delete(chunkId);
     roadsState.loadedChunks.delete(chunkId);
-
     await fetchSingleChunk(chunkId);
 }
 
@@ -283,13 +154,7 @@ export async function refreshChunk(lat, lng) {
 // ==========================
 async function fetchSingleChunk(chunkId) {
     try {
-        roadsState.chunks[chunkId] = {
-            status: 'loading',
-            roads: [],
-            buildings: [],
-            deposits: []
-        };
-
+        roadsState.chunks[chunkId] = { status: 'loading', roads: [], buildings: [], deposits: [] };
         setChunkColor(chunkId, 'orange');
 
         const [roadsRes, buildingsRes, depositsRes] = await Promise.all([
@@ -310,39 +175,22 @@ async function fetchSingleChunk(chunkId) {
             })
         ]);
 
-        if (!roadsRes.ok || !buildingsRes.ok || !depositsRes.ok) 
-            throw new Error("API error");
+        if (!roadsRes.ok || !buildingsRes.ok || !depositsRes.ok) throw new Error("API error");
 
         const roadsData     = await roadsRes.json();
         const buildingsData = await buildingsRes.json();
         const depositsData  = await depositsRes.json();
 
-        const chunkDeposits = depositsData[chunkId] || [];
-
         const chunkData = {
             roads:     roadsData[chunkId]?.roads     || [],
             buildings: buildingsData[chunkId]?.buildings || [],
-            deposits:  chunkDeposits
+            deposits:  depositsData[chunkId] || []
         };
 
         const hasRoads = chunkData.roads.length > 0;
 
-        roadsState.chunks[chunkId] = {
-            status: hasRoads ? 'loaded' : 'empty',
-            roads:     chunkData.roads,
-            buildings: chunkData.buildings,
-            deposits:  chunkData.deposits,
-            hasRoads
-        };
-
-        const cacheKey = getCacheKey(chunkId);
-        localStorage.setItem(cacheKey, JSON.stringify({
-            roads:     chunkData.roads,
-            buildings: chunkData.buildings,
-            deposits:  chunkData.deposits,
-            hasRoads,
-            ts: Date.now()
-        }));
+        roadsState.chunks[chunkId] = { status: hasRoads ? 'loaded' : 'empty', ...chunkData, hasRoads };
+        setCachedChunk(chunkId, { ...chunkData, hasRoads });
 
         setChunkColor(chunkId, hasRoads ? 'blue' : '#444');
         renderDepositsFromData(chunkData.deposits, getMap());
@@ -350,33 +198,39 @@ async function fetchSingleChunk(chunkId) {
         debugLog("roads", "[CHUNK REFRESH]", chunkId, chunkData.roads.length);
 
     } catch (e) {
-        roadsState.chunks[chunkId] = {
-            status: 'error',
-            roads: [],
-            buildings: [],
-            deposits: []
-        };
-
+        roadsState.chunks[chunkId] = { status: 'error', roads: [], buildings: [], deposits: [] };
         setChunkColor(chunkId, 'red');
         debugError("roads", "[CHUNK REFRESH ERROR]", chunkId, e);
     }
 }
 
-function getVisibleChunks(bounds) {
+// ==========================
+// REFRESH CHUNK COLORS
+// ==========================
+function refreshChunkColors(visibleChunks) {
+    for (const chunkId of visibleChunks) {
+        const chunk = roadsState.chunks[chunkId];
+        if (!chunk) { setChunkColor(chunkId, 'orange'); continue; }
 
+        const colors = { loaded: 'blue', empty: '#444', loading: 'orange', error: 'red' };
+        setChunkColor(chunkId, colors[chunk.status] ?? 'yellow');
+    }
+}
+
+// ==========================
+// VISIBLE CHUNKS
+// ==========================
+function getVisibleChunks(bounds) {
     const minX = Math.floor(bounds.getSouth() / CHUNK_SIZE);
     const maxX = Math.floor(bounds.getNorth() / CHUNK_SIZE);
+    const minY = Math.floor(bounds.getWest()  / CHUNK_SIZE);
+    const maxY = Math.floor(bounds.getEast()  / CHUNK_SIZE);
 
-    const minY = Math.floor(bounds.getWest() / CHUNK_SIZE);
-    const maxY = Math.floor(bounds.getEast() / CHUNK_SIZE);
-
-    const chunkId = [];
-
+    const chunks = [];
     for (let x = minX; x <= maxX; x++) {
         for (let y = minY; y <= maxY; y++) {
-            chunkId.push(`${x}_${y}`);
+            chunks.push(`${x}_${y}`);
         }
     }
-
-    return chunkId;
+    return chunks;
 }
