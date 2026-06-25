@@ -116,6 +116,46 @@ class Player
         return $this;
     }
 
+    public function getUserPseudo(): string
+    {
+        return $this->user?->getPseudo() ?? '';
+    }
+
+    public function getGameLabel(): string
+    {
+        return $this->game?->getLabel() ?? '';
+    }
+
+    public function getFactionLabel(): string
+    {
+        return $this->faction?->getLabel() ?? '';
+    }
+
+    public function getInventorySummary(): string
+    {
+        if ($this->playerInventories->isEmpty()) {
+            return 'Aucune ressource';
+        }
+
+        $lines = [];
+
+        foreach ($this->playerInventories as $inventory) {
+            $resource = $inventory->getResourceType();
+
+            $label = $resource?->getLabel()
+                ?? $resource?->getCode()?->value
+                ?? 'Inconnue';
+
+            $lines[] = sprintf(
+                '%s (%d)',
+                $label,
+                $inventory->getQuantity()
+            );
+        }
+
+        return implode(' | ', $lines);
+    }
+
     /**
      * @return Collection<int, Building>
      */
@@ -160,6 +200,13 @@ class Player
             $this->playerInventories->add($inventory);
             $inventory->setPlayer($this);
         }
+
+        return $this;
+    }
+
+    public function removePlayerInventory(PlayerInventory $inventory): static
+    {
+        $this->playerInventories->removeElement($inventory);
 
         return $this;
     }

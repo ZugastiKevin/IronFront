@@ -33,13 +33,12 @@ class GameCrudController extends AbstractCrudController
     {
         return [
             IdField::new('id')->onlyOnIndex(),
-            TextField::new('name')->setLabel('Nom de la partie'),
+            TextField::new('label')->setLabel('Nom de la partie'),
             TextEditorField::new('description')->setLabel('Description')->setRequired(false),
             BooleanField::new('is_active')->setLabel('Partie active')->setHelp('Indique si cette partie est actuellement active.'),
             DateTimeField::new('started_at')->setLabel('Démarrée le')->setFormat('dd/MM/yyyy HH:mm'),
             DateTimeField::new('ended_at')->setLabel('Terminée le')->setRequired(false),
-            AssociationField::new('users')->setLabel('Joueurs')->hideOnForm(),
-            AssociationField::new('buildings')->setLabel('Bâtiments')->hideOnForm(),
+            AssociationField::new('players')->setLabel('Joueurs')->hideOnForm(),
         ];
     }
 }

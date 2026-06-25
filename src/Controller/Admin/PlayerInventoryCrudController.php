@@ -2,43 +2,71 @@
 
 namespace App\Controller\Admin;
 
-use App\Entity\PlayerInventory;
-use App\Entity\ResourceType;
-use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
+use App\Entity\Player;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
-use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
+use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
 use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
-use EasyCorp\Bundle\EasyAdminBundle\Field\DateTimeField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\CollectionField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\IdField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\TextField;
+use EasyCorp\Bundle\EasyAdminBundle\Router\AdminUrlGenerator;
 
 class PlayerInventoryCrudController extends AbstractCrudController
 {
     public const INDEX = 'index';
-    
+
+    public function __construct(
+        private AdminUrlGenerator $adminUrlGenerator
+    ) {
+    }
+
     public static function getEntityFqcn(): string
     {
-        return PlayerInventory::class;
+        return Player::class;
     }
 
     public function configureCrud(Crud $crud): Crud
     {
         return $crud
-            ->setEntityLabelInSingular('Inventaire')
-            ->setEntityLabelInPlural('Inventaires')
-            ->setPageTitle(Crud::PAGE_INDEX, 'Gestion des inventaires')
-            ->setDefaultSort(['updatedAt' => 'DESC']);
+            ->setEntityLabelInSingular('Inventaire Joueur')
+            ->setEntityLabelInPlural('Inventaires Joueurs')
+            ->setPageTitle(
+                Crud::PAGE_INDEX,
+                'Gestion des inventaires joueurs'
+            )
+            ->setDefaultSort([
+                'id' => 'ASC'
+            ]);
+    }
+
+    public function configureActions(Actions $actions): Actions
+    {
+        return $actions->add(Crud::PAGE_INDEX, Action::DETAIL);
     }
 
     public function configureFields(string $pageName): iterable
     {
         return [
-            IdField::new('id')->onlyOnIndex(),
-            AssociationField::new('player', 'Joueur')->setRequired(true),
-            AssociationField::new('resourceType', 'Ressource')
-                ->setRequired(true)
-                ->setFormattedValue(fn(?ResourceType $resource) => $resource?->getCode()?->value ?? ''),
-            IntegerField::new('quantity', 'Quantité'),
-            DateTimeField::new('updatedAt', 'Dernière mise à jour')->hideOnForm(),
+
+            IdField::new('id')
+                ->onlyOnIndex(),
+
+            AssociationField::new('user')
+                ->setLabel('Joueur')
+                ->setCrudController(UserCrudController::class),
+
+            AssociationField::new('game')
+                ->setLabel('Partie')
+                ->setCrudController(GameCrudController::class),
+
+            AssociationField::new('faction')
+                ->setLabel('Faction')
+                ->setCrudController(FactionCrudController::class),
+
+            CollectionField::new('playerInventories')
+                ->useEntryCrudForm(PlayerInventoryItemCrudController::class),
         ];
     }
 }

@@ -41,9 +41,9 @@ class DashboardController extends AbstractDashboardController
         yield MenuItem::linkToRoute('Aller au Jeu en admin', 'fas fa-gamepad', 'game');
 
         yield MenuItem::section('Gestion Utilisateurs');
-        yield MenuItem::linkTo(GameCrudController::class, 'Gestion des session de jeux ', 'fas fa-game')->setAction(GameCrudController::INDEX);
+        yield MenuItem::linkTo(GameCrudController::class, 'Gestion des session de jeux ', 'fas fa-server')->setAction(GameCrudController::INDEX);
         yield MenuItem::linkTo(UserCrudController::class, 'Gestion des utilisateurs ', 'fas fa-users')->setAction(UserCrudController::INDEX);
-        yield MenuItem::linkTo(PlayerInventoryCrudController::class, 'Inventaires des joueurs', 'fas fa-backpack')->setAction(PlayerInventoryCrudController::INDEX);
+        yield MenuItem::linkTo(PlayerInventoryCrudController::class, 'Inventaires des joueurs', 'fas fa-warehouse')->setAction(PlayerInventoryCrudController::INDEX);
         yield MenuItem::linkTo(BuildingCrudController::class, 'Gestion des bâtiments ', 'fas fa-building')->setAction(BuildingCrudController::INDEX);
 
         yield MenuItem::section('Gestion Jeu');
@@ -51,6 +51,6 @@ class DashboardController extends AbstractDashboardController
         yield MenuItem::linkTo(BuildingTypeCrudController::class, 'Gestion des types de bâtiments', 'fas fa-layer-group')->setAction(BuildingTypeCrudController::INDEX);
         yield MenuItem::linkTo(ResourceTypeCrudController::class, 'Gestion des types de ressources', 'fas fa-gem')->setAction(ResourceTypeCrudController::INDEX);
         yield MenuItem::linkTo(FactionBuildingImageCrudController::class, 'Gestion des images de bâtiments', 'fas fa-image')->setAction(FactionBuildingImageCrudController::INDEX);
-        yield MenuItem::linkTo(ResourceImageCrudController::class, 'Gestion des images de ressources', 'fas fa-gem')->setAction(ResourceImageCrudController::INDEX);
+        yield MenuItem::linkTo(ResourceImageCrudController::class, 'Gestion des images de ressources', 'fas fa-image')->setAction(ResourceImageCrudController::INDEX);
     }
 }
