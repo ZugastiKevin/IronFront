@@ -3,7 +3,6 @@
 namespace App\Controller\Admin;
 
 use App\Entity\ResourceImage;
-use App\Entity\ResourceType;
 use Doctrine\ORM\EntityManagerInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
 use EasyCorp\Bundle\EasyAdminBundle\Field\Field;
