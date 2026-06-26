@@ -1,8 +1,8 @@
 import { CHUNK_SIZE } from './chunk.js';
 
 export function snapToChunk(lat, lng) {
-    const x = Math.round(lat / CHUNK_SIZE);
-    const y = Math.round(lng / CHUNK_SIZE);
+    const x = Math.floor(Math.round(lat * 100) / 1);
+    const y = Math.floor(Math.round(lng * 100) / 1);
 
     return {
         lat: Number((x * CHUNK_SIZE).toFixed(8)),

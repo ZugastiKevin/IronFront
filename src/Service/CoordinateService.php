@@ -40,6 +40,6 @@ class CoordinateService
      */
     public function getChunkId(float $lat, float $lng): string
     {
-        return floor($lat * self::CHUNK_SIZE_DIVIDER) . '_' . floor($lng * self::CHUNK_SIZE_DIVIDER);
+        return (int)floor(round($lat * self::CHUNK_SIZE_DIVIDER, 6)). '_' .(int)floor(round($lng * self::CHUNK_SIZE_DIVIDER, 6));
     }
 }

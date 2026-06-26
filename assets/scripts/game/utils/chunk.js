@@ -28,11 +28,15 @@ document.getElementById('requestApiRoadsAndChunksBtn').addEventListener('click',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     lat: snapped.lat,
-                    lng: snapped.lng
+                    lng: snapped.lng,
+                    chunkId: snapped.chunkId
                 })
             });
 
             refreshChunk(snapped.chunkId);
+
+            debugLog("chunks", "snap result:", snapped);
+            debugLog("chunks", "raw:", { lat, lng, x: lat/0.01, y: lng/0.01 });
 
             debugLog("chunks", "🔄 chunk refreshed:", snapped.chunkId);
 

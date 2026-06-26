@@ -39,6 +39,13 @@ class GenerateChunkService
         $chunkId = $this->coordinateService->getChunkId($lat, $lng);
         $chunk   = $this->chunkRepository->findOrCreate($chunkId);
 
+        $this->logger->info(sprintf(
+            "Generate chunk %s : lat=%F lng=%F",
+            $chunkId,
+            $lat,
+            $lng
+        ));
+
         if ($chunk->getRoads()->count() > 0) {
             $this->logger->info("Chunk {$chunkId} déjà peuplé, annulation.");
             return [];
@@ -92,6 +99,15 @@ class GenerateChunkService
         $latMax = ($x + 1) * $size;
         $lngMin = $y * $size;
         $lngMax = ($y + 1) * $size;
+
+        $this->logger->info(sprintf(
+            "BBox : %F,%F -> %F,%F",
+            $latMin,
+            $lngMin,
+            $latMax,
+            $lngMax
+        ));
+
 
         $query    = "[out:json][timeout:25];way[\"highway\"]($latMin,$lngMin,$latMax,$lngMax);out geom;";
         $url      = "https://overpass-api.de/api/interpreter";

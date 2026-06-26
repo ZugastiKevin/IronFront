@@ -8,16 +8,6 @@ import { renderDepositsFromData } from '../deposits/deposits.js';
 import { getCachedChunk, setCachedChunk, invalidateChunkCache } from './chunkCache.js';
 
 // ==========================
-// CHUNK ID
-// ==========================
-function getChunkId(lat, lng) {
-    const x = Math.round(lat / CHUNK_SIZE);
-    const y = Math.round(lng / CHUNK_SIZE);
-
-    return `${x}_${y}`;
-}
-
-// ==========================
 // MAIN LOAD VISIBLE
 // ==========================
 export async function loadVisibleRoadChunks() {
