@@ -13,6 +13,9 @@ import { getCachedChunk, setCachedChunk, invalidateChunkCache } from './chunkCac
 function getChunkId(lat, lng) {
     const x = Math.floor(lat / CHUNK_SIZE);
     const y = Math.floor(lng / CHUNK_SIZE);
+
+    console.log("getChunkId", lat, lng, x, y);
+
     return `${x}_${y}`;
 }
 
@@ -124,9 +127,14 @@ export async function loadVisibleRoadChunks() {
 // ==========================
 export async function refreshChunk(lat, lng) {
     const chunkId = getChunkId(lat, lng);
+
+    console.log("refreshChunk", lat, lng, chunkId);
+
     invalidateChunk(chunkId);
     invalidateChunkCache(chunkId);
+
     roadsState.loadedChunks.delete(chunkId);
+
     await fetchSingleChunk(chunkId);
 }
 
