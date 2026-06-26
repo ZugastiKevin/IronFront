@@ -32,7 +32,7 @@ document.getElementById('requestApiRoadsAndChunksBtn').addEventListener('click',
                 })
             });
 
-            refreshChunk(snapped.lat, snapped.lng);
+            refreshChunk(snapped.chunkId);
 
             debugLog("chunks", "🔄 chunk refreshed:", snapped.chunkId);
 

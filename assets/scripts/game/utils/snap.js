@@ -1,12 +1,12 @@
 import { CHUNK_SIZE } from './chunk.js';
 
 export function snapToChunk(lat, lng) {
-    const x = Math.floor(lat / CHUNK_SIZE);
-    const y = Math.floor(lng / CHUNK_SIZE);
+    const x = Math.round(lat / CHUNK_SIZE);
+    const y = Math.round(lng / CHUNK_SIZE);
 
     return {
-        lat: x * CHUNK_SIZE,
-        lng: y * CHUNK_SIZE,
+        lat: Number((x * CHUNK_SIZE).toFixed(8)),
+        lng: Number((y * CHUNK_SIZE).toFixed(8)),
         chunkId: `${x}_${y}`
     };
 }
