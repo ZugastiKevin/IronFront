@@ -5,26 +5,7 @@ import { invalidateChunk } from './invalidateChunk.js';
 import { debugLog, debugWarn, debugError } from '../../../utils/debug.js';
 import { roadsState } from './roadsState.js';
 import { renderDepositsFromData } from '../deposits/deposits.js';
-
-// ==========================
-// CACHE EN MÉMOIRE
-// ==========================
-const chunkCache = new Map();
-const CACHE_TTL  = 3600000; // 1h
-
-function getCachedChunk(chunkId) {
-    const cached = chunkCache.get(chunkId);
-    if (!cached) return null;
-    if (Date.now() - cached.ts > CACHE_TTL) {
-        chunkCache.delete(chunkId);
-        return null;
-    }
-    return cached;
-}
-
-function setCachedChunk(chunkId, data) {
-    chunkCache.set(chunkId, { ...data, ts: Date.now() });
-}
+import { getCachedChunk, setCachedChunk, invalidateChunkCache } from './chunkCache.js';
 
 // ==========================
 // CHUNK ID
@@ -144,7 +125,7 @@ export async function loadVisibleRoadChunks() {
 export async function refreshChunk(lat, lng) {
     const chunkId = getChunkId(lat, lng);
     invalidateChunk(chunkId);
-    chunkCache.delete(chunkId);
+    invalidateChunkCache(chunkId);
     roadsState.loadedChunks.delete(chunkId);
     await fetchSingleChunk(chunkId);
 }
