@@ -26,4 +26,13 @@ final class NotificationRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    public function latest(int $limit = 20): array
+    {
+        return $this->createQueryBuilder('n')
+            ->orderBy('n.createdAt', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
 }
