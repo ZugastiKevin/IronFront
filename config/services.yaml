@@ -20,6 +20,8 @@ parameters:
     osm.pbf_dir: 'D:/osm'
     # Binaire osmium (conda). Chemin absolu pour WAMP (pas dans le PATH).
     osm.osmium_binary: 'C:\Users\rocha\miniconda3\Library\bin\osmium.exe'
+    # Binaire ogr2ogr (GDAL via conda). Pour conversion PBF → SpatiaLite.
+    osm.ogr2ogr_binary: 'C:\Users\rocha\miniconda3\Library\bin\ogr2ogr.exe'
     # Régions Geofabrik : nom => {file, bbox englobante {s,w,n,e}}
     osm.regions:
         africa:
@@ -82,11 +84,12 @@ services:
     App\Command\WorldExpansionCommand:
         autowire: true
 
-    # Commande d'import des routes Geofabrik dans MySQL (INSERT bruts DBAL)
+    # Commande d'import des routes Geofabrik dans MySQL (SpatiaLite + checkpoint)
     App\Command\OsmImportCommand:
         arguments:
             $pbfDir: '%osm.pbf_dir%'
             $osmiumBinary: '%osm.osmium_binary%'
+            $ogr2ogrBinary: '%osm.ogr2ogr_binary%'
             $osmRegions: '%osm.regions%'
 
     # Commande de génération des chunks et deposits à partir des routes importées
