@@ -8,6 +8,7 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: ChunkRepository::class)]
+#[ORM\UniqueConstraint(name: 'UNIQ_chunk_bbox', columns: ['lat_min', 'lng_min', 'lat_max', 'lng_max'])]
 class Chunk
 {
     #[ORM\Id]
@@ -15,31 +16,57 @@ class Chunk
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column(type: 'string', length: 50, unique: true)]
-    private string $chunkId;
+    /**
+     * Ancien identifiant "X_Y" — conservé temporairement pour le backfill (Phase 1).
+     * Sera supprimé en Phase 9.
+     */
+    #[ORM\Column(type: 'string', length: 50, unique: true, nullable: true)]
+    private ?string $chunkId = null;
 
     #[ORM\Column(type: "datetime_immutable")]
     private \DateTimeImmutable $updatedAt;
 
-    #[ORM\OneToMany(targetEntity: Building::class, mappedBy: 'chunk')]
-    private Collection $buildings;
+    #[ORM\Column(type: 'decimal', precision: 10, scale: 7, nullable: true)]
+    private ?string $latMin = null;
+
+    #[ORM\Column(type: 'decimal', precision: 10, scale: 7, nullable: true)]
+    private ?string $lngMin = null;
+
+    #[ORM\Column(type: 'decimal', precision: 10, scale: 7, nullable: true)]
+    private ?string $latMax = null;
+
+    #[ORM\Column(type: 'decimal', precision: 10, scale: 7, nullable: true)]
+    private ?string $lngMax = null;
 
     /**
-     * @var Collection<int, Road>
+     * Statut du chunk pour l'expansion continentale.
+     *
+     * null   = jamais touché (frontière potentielle)
+     * 'populated' = a au moins une route
+     * 'empty'     = récupéré, 0 routes (océan/désert)
+     * 'failed'    = échec après retry
      */
-    #[ORM\OneToMany(targetEntity: Road::class, mappedBy: 'chunk')]
-    private Collection $roads;
+    #[ORM\Column(type: 'string', length: 16, nullable: true)]
+    private ?string $status = null;
+
+    /**
+     * @var Collection<int, Building>
+     */
+    #[ORM\OneToMany(targetEntity: Building::class, mappedBy: 'chunk')]
+    private Collection $buildings;
 
     public function __construct()
     {
         $this->updatedAt = new \DateTimeImmutable();
-        $this->roads = new ArrayCollection();
         $this->buildings = new ArrayCollection();
     }
 
     public function __toString(): string
     {
-        return $this->chunkId ?? 'Chunk #' . $this->id;
+        if ($this->latMin !== null && $this->lngMin !== null) {
+            return sprintf('Chunk %s,%s', $this->latMin, $this->lngMin);
+        }
+        return 'Chunk #' . $this->id;
     }
 
     public function getId(): ?int
@@ -52,7 +79,7 @@ class Chunk
         return $this->chunkId;
     }
 
-    public function setChunkId(string $chunkId): static
+    public function setChunkId(?string $chunkId): static
     {
         $this->chunkId = $chunkId;
         return $this;
@@ -69,33 +96,58 @@ class Chunk
         return $this;
     }
 
-    /**
-     * @return Collection<int, Road>
-     */
-    public function getRoads(): Collection
+    public function getLatMin(): ?float
     {
-        return $this->roads;
+        return $this->latMin !== null ? (float) $this->latMin : null;
     }
 
-    public function addRoad(Road $road): static
+    public function setLatMin(float $latMin): static
     {
-        if (!$this->roads->contains($road)) {
-            $this->roads->add($road);
-            $road->setChunk($this);
-        }
-
+        $this->latMin = $latMin;
         return $this;
     }
 
-    public function removeRoad(Road $road): static
+    public function getLngMin(): ?float
     {
-        if ($this->roads->removeElement($road)) {
-            // set the owning side to null (unless already changed)
-            if ($road->getChunk() === $this) {
-                $road->setChunk(null);
-            }
-        }
+        return $this->lngMin !== null ? (float) $this->lngMin : null;
+    }
 
+    public function setLngMin(float $lngMin): static
+    {
+        $this->lngMin = $lngMin;
+        return $this;
+    }
+
+    public function getLatMax(): ?float
+    {
+        return $this->latMax !== null ? (float) $this->latMax : null;
+    }
+
+    public function setLatMax(float $latMax): static
+    {
+        $this->latMax = $latMax;
+        return $this;
+    }
+
+    public function getLngMax(): ?float
+    {
+        return $this->lngMax !== null ? (float) $this->lngMax : null;
+    }
+
+    public function setLngMax(float $lngMax): static
+    {
+        $this->lngMax = $lngMax;
+        return $this;
+    }
+
+    public function getStatus(): ?string
+    {
+        return $this->status;
+    }
+
+    public function setStatus(?string $status): static
+    {
+        $this->status = $status;
         return $this;
     }
 
@@ -120,7 +172,6 @@ class Chunk
     public function removeBuilding(Building $building): static
     {
         if ($this->buildings->removeElement($building)) {
-            // set the owning side to null (unless already changed)
             if ($building->getChunk() === $this) {
                 $building->setChunk(null);
             }

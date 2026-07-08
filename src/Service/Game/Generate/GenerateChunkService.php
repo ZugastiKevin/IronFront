@@ -4,188 +4,217 @@ namespace App\Service\Game\Generate;
 
 use App\Entity\Chunk;
 use App\Entity\ResourceDeposit;
-use App\Entity\ResourceType;
 use App\Entity\Road;
 use App\Repository\ChunkRepository;
+use App\Repository\ResourceDepositRepository;
 use App\Repository\ResourceTypeRepository;
+use App\Repository\RoadRepository;
 use App\Service\CoordinateService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Service responsable de la génération du contenu d'un chunk,
- * notamment en allant chercher les données de routes depuis une API externe (Overpass).
+ * Service responsable de la génération du contenu d'une zone.
+ *
+ * Les routes sont lues depuis la table `road` (déjà importée via OsmImportCommand).
+ * Les dépôts de ressources sont placés déterministement.
  */
 class GenerateChunkService
 {
     public function __construct(
         private ResourceTypeRepository $resourceTypeRepository,
         private ChunkRepository $chunkRepository,
+        private RoadRepository $roadRepository,
+        private ResourceDepositRepository $resourceDepositRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
-        private CoordinateService $coordinateService
+        private CoordinateService $coordinateService,
+        private GeofabrikRoadProvider $roadProvider,
+        private DeterministicResourcePlacer $resourcePlacer,
     ) {}
 
+    public function clearEntityManager(): void
+    {
+        $this->em->clear();
+    }
+
     /**
-     * Génère les routes pour un chunk donné à partir de coordonnées.
-     * Si les routes ont déjà été générées pour ce chunk, ne fait rien.
-     *
-     * @param float $lat Latitude pour identifier le chunk
-     * @param float $lng Longitude pour identifier le chunk
-     * @return array Les données des routes générées, ou un tableau vide si déjà fait ou en cas d'erreur.
+     * Génère les routes pour une zone. Si routes existent déjà, crée les dépôts.
      */
     public function generate(float $lat, float $lng): array
     {
-        $chunkId = $this->coordinateService->getChunkId($lat, $lng);
-        $chunk   = $this->chunkRepository->findOrCreate($chunkId);
+        $bbox = $this->coordinateService->getBoundingBox($lat, $lng);
+        $chunk = $this->chunkRepository->findOrCreateByBbox($bbox);
 
         $this->logger->info(sprintf(
-            "Generate chunk %s : lat=%F lng=%F",
-            $chunkId,
-            $lat,
-            $lng
+            "Generate zone : lat=%F lng=%F → bbox [%s]",
+            $lat, $lng,
+            $this->coordinateService->bboxKey($bbox)
         ));
 
-        if ($chunk->getRoads()->count() > 0) {
-            $this->logger->info("Chunk {$chunkId} déjà peuplé, annulation.");
+        // Chercher les routes existantes
+        $existingRoads = $this->roadRepository->findByBbox(
+            $bbox['latMin'] - 0.001,
+            $bbox['lngMin'] - 0.001,
+            $bbox['latMax'] + 0.001,
+            $bbox['lngMax'] + 0.001
+        );
+
+        // Si routes existent, créer les dépôts si besoin
+        if (!empty($existingRoads)) {
+            $this->logger->info(sprintf("Zone populatee : %d routes existantes", count($existingRoads)));
+
+            $deposits = $this->createDepositsIfNeeded($chunk, $bbox, $existingRoads);
+
+            $chunk->setUpdatedAt(new \DateTimeImmutable());
+            $this->em->flush();
+
+            return [
+                'roads' => [], // Pas de nouvelles routes
+                'roads_created' => 0,
+                'deposits_created' => count($deposits),
+            ];
+        }
+
+        // Sinon, chercher dans roads_mysql via le provider
+        $roads = $this->roadProvider->findRoadsInBbox(
+            $bbox['latMin'] - 0.001,
+            $bbox['lngMin'] - 0.001,
+            $bbox['latMax'] + 0.001,
+            $bbox['lngMax'] + 0.001
+        );
+
+        if (empty($roads)) {
+            $this->logger->info("Zone sans routes (ocean/desert)");
+            $chunk->setUpdatedAt(new \DateTimeImmutable());
+            $this->em->flush();
             return [];
         }
 
-        $roads    = $this->fetchFromOverpass($lat, $lng, $chunk);
-        $allTypes = $this->resourceTypeRepository->findAll();
-        $allTypes = array_values(array_filter($allTypes, fn($rt) => !empty($rt->getColor())));
+        // Persister les routes et dépôts
+        $deposits = $this->createDepositsIfNeeded($chunk, $bbox, $roads);
 
-        if (empty($allTypes)) {
-            $this->logger->warning("Aucun type de ressource extractible trouvé.");
-            return $roads;
+        foreach ($roads as $road) {
+            $this->em->persist($road);
         }
-
-        $depositCount  = !empty($roads) ? rand(1, min(2, count($roads))) : 0;
-        $selectedRoads = [];
-
-        if ($depositCount > 0) {
-            $shuffled = $roads;
-            shuffle($shuffled);
-            $selectedRoads = array_slice($shuffled, 0, $depositCount);
-
-            foreach ($selectedRoads as $road) {
-                $randomType = $this->selectResourceByRarity($allTypes);
-                $deposit = new ResourceDeposit($randomType, $this->generateRichness());
-                $deposit->setRoad($road);
-
-                $points = $road->getPoints();
-                if (!empty($points)) {
-                    $deposit->setLatitude((float)$points[0][0]);
-                    $deposit->setLongitude((float)$points[0][1]);
-                }
-
-                $this->em->persist($deposit);
-                $this->logger->info("Dépôt [{$randomType->getCode()->value}] généré sur route {$road->getId()}.");
-            }
+        foreach ($deposits as $deposit) {
+            $this->em->persist($deposit);
         }
 
         $this->em->flush();
-        $this->logger->info("Chunk {$chunkId} : " . count($roads) . " routes, " . count($selectedRoads) . " dépôt(s).");
-
-        return $roads;
-    }
-
-    private function fetchFromOverpass(float $lat, float $lng, Chunk $chunk): array
-    {
-        $size   = 0.01;
-        $x      = floor($lat / $size);
-        $y      = floor($lng / $size);
-        $latMin = $x * $size;
-        $latMax = ($x + 1) * $size;
-        $lngMin = $y * $size;
-        $lngMax = ($y + 1) * $size;
+        $chunk->setUpdatedAt(new \DateTimeImmutable());
+        $this->em->flush();
 
         $this->logger->info(sprintf(
-            "BBox : %F,%F -> %F,%F",
-            $latMin,
-            $lngMin,
-            $latMax,
-            $lngMax
+            "Zone %s : %d routes, %d depots.",
+            $this->coordinateService->bboxKey($bbox),
+            count($roads),
+            count($deposits)
         ));
 
+        return [
+            'roads' => $roads,
+            'roads_created' => count($roads),
+            'deposits_created' => count($deposits),
+        ];
+    }
 
-        $query    = "[out:json][timeout:25];way[\"highway\"]($latMin,$lngMin,$latMax,$lngMax);out geom;";
-        $url      = "https://overpass-api.de/api/interpreter";
-        $response = @file_get_contents($url, false, stream_context_create([
-            'http' => [
-                'method'  => 'POST',
-                'header'  => "Content-Type: application/x-www-form-urlencoded\r\nUser-Agent: IronFront/1.0",
-                'content' => http_build_query(['data' => $query]),
-                'timeout' => 20,
-            ]
-        ]));
+    /**
+     * Ajoute des routes pour une zone.
+     */
+    public function addRoadsChunk(float $lat, float $lng): array
+    {
+        $bbox = $this->coordinateService->getBoundingBox($lat, $lng);
+        $chunk = $this->chunkRepository->findOrCreateByBbox($bbox);
 
-        if ($response === false) {
-            $this->logger->error("Échec Overpass pour chunk " . $chunk->getChunkId());
-            return [];
+        // Chercher les routes existantes
+        $existingRoads = $this->roadRepository->findByBbox(
+            $bbox['latMin'] - 0.001,
+            $bbox['lngMin'] - 0.001,
+            $bbox['latMax'] + 0.001,
+            $bbox['lngMax'] + 0.001
+        );
+
+        $alreadyPopulated = !empty($existingRoads);
+
+        // Si routes existent, juste créer les dépôts
+        if ($alreadyPopulated) {
+            $this->logger->info(sprintf("Zone populatee : %d routes", count($existingRoads)));
+
+            $deposits = $this->createDepositsIfNeeded($chunk, $bbox, $existingRoads);
+
+            $chunk->setUpdatedAt(new \DateTimeImmutable());
+            $this->em->flush();
+
+            return [
+                'roads' => [],
+                'roads_created' => 0,
+                'already_populated' => true,
+            ];
         }
 
-        $data = json_decode($response, true);
-        if (!isset($data['elements'])) {
-            return [];
+        // Sinon, chercher dans le provider (roads_mysql)
+        $roads = $this->roadProvider->findRoadsInBbox(
+            $bbox['latMin'] - 0.001,
+            $bbox['lngMin'] - 0.001,
+            $bbox['latMax'] + 0.001,
+            $bbox['lngMax'] + 0.001
+        );
+
+        if (empty($roads)) {
+            $chunk->setUpdatedAt(new \DateTimeImmutable());
+            $this->em->flush();
+            return ['roads' => [], 'roads_created' => 0, 'already_populated' => false];
         }
 
-        $roads = [];
-        foreach ($data['elements'] as $way) {
-            if (!isset($way['geometry']) || count($way['geometry']) < 2) continue;
+        // Créer les dépôts
+        $deposits = $this->createDepositsIfNeeded($chunk, $bbox, $roads);
 
-            $points = [];
-            foreach ($way['geometry'] as $node) {
-                if (!isset($node['lat'], $node['lon'])) continue;
-                $points[] = [(float)$node['lat'], (float)$node['lon']];
-            }
-            if (count($points) < 2) continue;
-
-            $road = new Road();
-            $road->setChunk($chunk);
-            $road->setPoints($points);
-            $road->setType($way['tags']['highway'] ?? 'road');
+        // Persister
+        foreach ($roads as $road) {
             $this->em->persist($road);
-            $roads[] = $road;
+        }
+        foreach ($deposits as $deposit) {
+            $this->em->persist($deposit);
         }
 
+        $this->em->flush();
         $chunk->setUpdatedAt(new \DateTimeImmutable());
-        $this->em->persist($chunk);
+        $this->em->flush();
 
-        $this->logger->info(count($roads) . " routes récupérées pour chunk " . $chunk->getChunkId());
-        return $roads;
+        $this->logger->info(sprintf(
+            "Zone %s : %d routes, %d depots.",
+            $this->coordinateService->bboxKey($bbox),
+            count($roads),
+            count($deposits)
+        ));
+
+        return [
+            'roads' => $roads,
+            'roads_created' => count($roads),
+            'already_populated' => false,
+        ];
     }
 
-    private function selectResourceByRarity(array $types): ResourceType
+    /** Crée les dépôts si < 2 dans la zone. */
+    private function createDepositsIfNeeded(Chunk $chunk, array $bbox, array $roads): array
     {
-        $roll = rand(1, 100);
+        $existingDepositCount = (int) $this->resourceDepositRepository->createQueryBuilder('d')
+            ->select('COUNT(d.id)')
+            ->where('d.latitude BETWEEN :latMin AND :latMax')
+            ->andWhere('d.longitude BETWEEN :lngMin AND :lngMax')
+            ->setParameter('latMin', $bbox['latMin'] - 0.001)
+            ->setParameter('latMax', $bbox['latMax'] + 0.001)
+            ->setParameter('lngMin', $bbox['lngMin'] - 0.001)
+            ->setParameter('lngMax', $bbox['lngMax'] + 0.001)
+            ->getQuery()
+            ->getSingleScalarResult();
 
-        if ($roll <= 10) {
-            $filtered = array_values(array_filter($types, fn($rt) => $rt->getRarity() >= 2));
-            if (!empty($filtered)) return $filtered[array_rand($filtered)];
+        if ($existingDepositCount >= 2) {
+            return [];
         }
 
-        if ($roll <= 25) {
-            $filtered = array_values(array_filter($types, fn($rt) => $rt->getRarity() >= 1));
-            if (!empty($filtered)) return $filtered[array_rand($filtered)];
-        }
-
-        $common = array_values(array_filter($types, fn($rt) => $rt->getRarity() === 0));
-        if (!empty($common)) return $common[array_rand($common)];
-
-        return $types[array_rand($types)];
-    }
-
-    private function generateRichness(): float
-    {
-        $roll = rand(1, 100);
-
-        return match(true) {
-            $roll <= 10  => 0.6,  // très pauvre (10%)
-            $roll <= 25  => 0.8,  // pauvre (15%)
-            $roll <= 60  => 1.0,  // normal (35%)
-            $roll <= 85  => 1.2,  // riche (25%)
-            default      => 1.4,  // très riche (15%)
-        };
+        $allTypes = $this->resourceTypeRepository->findAll();
+        return $this->resourcePlacer->placeResources($chunk, $roads, $allTypes);
     }
 }

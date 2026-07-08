@@ -3,11 +3,9 @@
 namespace App\Tests\Service\Generate;
 
 use App\Entity\Chunk;
-use App\Entity\Road;
 use App\Repository\ChunkRepository;
 use App\Service\Game\Generate\GenerateChunkService;
 use App\Service\Game\Generate\WorldExpansionService;
-use Doctrine\Common\Collections\ArrayCollection;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -28,21 +26,22 @@ final class WorldExpansionServiceTest extends TestCase
         $this->service = new WorldExpansionService(
             $this->chunkRepository,
             $this->generateChunkService,
-            $this->logger
+            $this->logger,
         );
     }
 
-    public function testExpandReturnsFalseWhenNoPopulatedChunk(): void
+    public function testExpandReturnsFalseWhenNoChunkFound(): void
     {
         $this->chunkRepository
             ->expects($this->once())
-            ->method('findRandomChunkWithRoads')
+            ->method('findRandomChunkWithBuildings')
             ->willReturn(null);
 
-        $this->logger
+        $this->chunkRepository
             ->expects($this->once())
-            ->method('warning')
-            ->with('[WorldExpansion] Aucun chunk peuplé trouvé.');
+            ->method('findOneBy')
+            ->with([])
+            ->willReturn(null);
 
         $result = $this->service->expand();
 
@@ -52,34 +51,28 @@ final class WorldExpansionServiceTest extends TestCase
     public function testExpandReturnsTrueWhenNeighborGenerated(): void
     {
         $sourceChunk = new Chunk();
-        $sourceChunk->setChunkId('4885_234');
-
-        // Mock roads to make it "populated"
-        $road = new Road();
-        $sourceChunk->addRoad($road);
-
-        $neighborChunk = new Chunk();
-        $neighborChunk->setChunkId('4886_234');
-        // Pas de routes
+        $sourceChunk->setLatMin(48.85);
+        $sourceChunk->setLngMin(2.35);
+        $sourceChunk->setLatMax(48.86);
+        $sourceChunk->setLngMax(2.36);
 
         $this->chunkRepository
             ->expects($this->once())
-            ->method('findRandomChunkWithRoads')
+            ->method('findRandomChunkWithBuildings')
             ->willReturn($sourceChunk);
 
+        // findByBbox retourne null pour le premier voisin testé (il n'existe pas)
+        // L'ordre étant aléatoire (shuffle), on ne teste pas les coordonnées exactes
         $this->chunkRepository
             ->expects($this->once())
-            ->method('findOneByChunkId')
-            ->willReturn($neighborChunk);
+            ->method('findByBbox')
+            ->willReturn(null);
 
         $this->generateChunkService
             ->expects($this->once())
             ->method('generate')
-            ->willReturn([new Road()]); // Retourne des routes générées
-
-        $this->logger
-            ->expects($this->atLeastOnce())
-            ->method('info');
+            ->with($this->anything(), $this->anything())
+            ->willReturn([new \App\Entity\Road()]);
 
         $result = $this->service->expand();
 
@@ -89,33 +82,31 @@ final class WorldExpansionServiceTest extends TestCase
     public function testExpandReturnsFalseWhenNoNeighborsCanBeGenerated(): void
     {
         $sourceChunk = new Chunk();
-        $sourceChunk->setChunkId('4885_234');
+        $sourceChunk->setLatMin(48.85);
+        $sourceChunk->setLngMin(2.35);
+        $sourceChunk->setLatMax(48.86);
+        $sourceChunk->setLngMax(2.36);
 
-        $road = new Road();
-        $sourceChunk->addRoad($road);
-
-        $neighborChunk = new Chunk();
-        $neighborChunk->setChunkId('4886_234');
-        // Pas de routes
+        $existingNeighbor = new Chunk();
+        $existingNeighbor->setLatMin(48.86);
+        $existingNeighbor->setLngMin(2.35);
+        $existingNeighbor->setLatMax(48.87);
+        $existingNeighbor->setLngMax(2.36);
 
         $this->chunkRepository
             ->expects($this->once())
-            ->method('findRandomChunkWithRoads')
+            ->method('findRandomChunkWithBuildings')
             ->willReturn($sourceChunk);
 
+        // Tous les voisins existent déjà
         $this->chunkRepository
             ->expects($this->exactly(8))
-            ->method('findOneByChunkId')
-            ->willReturn($neighborChunk);
+            ->method('findByBbox')
+            ->willReturn($existingNeighbor);
 
         $this->generateChunkService
-            ->expects($this->exactly(8))
-            ->method('generate')
-            ->willReturn([]); // Pas de routes générées
-
-        $this->logger
-            ->expects($this->atLeastOnce())
-            ->method('warning');
+            ->expects($this->never())
+            ->method('generate');
 
         $result = $this->service->expand();
 

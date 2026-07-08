@@ -1,13 +1,13 @@
 <?php
+
 namespace App\Service\Game\Generate;
 
 use App\Repository\ChunkRepository;
+use App\Service\CoordinateService;
 use Psr\Log\LoggerInterface;
 
 class WorldExpansionService
 {
-    private const CHUNK_SIZE = 0.01;
-
     public function __construct(
         private readonly ChunkRepository $chunkRepository,
         private readonly GenerateChunkService $generateChunkService,
@@ -16,47 +16,74 @@ class WorldExpansionService
 
     public function expand(): bool
     {
-        $populatedChunk = $this->chunkRepository->findRandomChunkWithRoads();
+        // On part d'un chunk au hasard (qui a des bâtiments ou pas — on cherche juste une zone déjà fetchée)
+        $seedChunk = $this->chunkRepository->findRandomChunkWithBuildings()
+            ?? $this->chunkRepository->findOneBy([]);
 
-        if (!$populatedChunk) {
-            $this->logger->warning('[WorldExpansion] Aucun chunk peuplé trouvé.');
+        if (!$seedChunk) {
+            $this->logger->warning('[WorldExpansion] Aucun chunk trouvé.');
             return false;
         }
 
-        $this->logger->info('[WorldExpansion] Chunk de départ : ' . $populatedChunk->getChunkId());
+        $this->logger->info(sprintf(
+            '[WorldExpansion] Chunk de départ : %s (%s,%s)',
+            $seedChunk->getId(),
+            $seedChunk->getLatMin(),
+            $seedChunk->getLngMin()
+        ));
 
-        [$x, $y] = array_map('intval', explode('_', $populatedChunk->getChunkId()));
+        $size = CoordinateService::CHUNK_SIZE;
 
-        $neighbors = [
-            [$x + 1, $y], [$x - 1, $y],
-            [$x, $y + 1], [$x, $y - 1],
-            [$x + 1, $y + 1], [$x + 1, $y - 1],
-            [$x - 1, $y + 1], [$x - 1, $y - 1],
+        // 8 voisins (cardinaux + diagonaux) en bbox
+        $neighborOffsets = [
+            [+1, 0], [-1, 0], [0, +1], [0, -1],
+            [+1, +1], [+1, -1], [-1, +1], [-1, -1],
         ];
-        shuffle($neighbors);
+        shuffle($neighborOffsets);
 
-        foreach ($neighbors as [$nx, $ny]) {
-            $neighborChunkId = "{$nx}_{$ny}";
-            $neighborChunk   = $this->chunkRepository->findOneByChunkId($neighborChunkId);
+        foreach ($neighborOffsets as [$dx, $dy]) {
+            $bbox = [
+                'latMin' => $seedChunk->getLatMin() + $dx * $size,
+                'lngMin' => $seedChunk->getLngMin() + $dy * $size,
+                'latMax' => $seedChunk->getLatMax() + $dx * $size,
+                'lngMax' => $seedChunk->getLngMax() + $dy * $size,
+            ];
 
-            if (!$neighborChunk || $neighborChunk->getRoads()->isEmpty()) {
-                $this->logger->info("[WorldExpansion] Voisin vide : {$neighborChunkId}");
+            $existing = $this->chunkRepository->findByBbox($bbox);
 
-                $lat = $nx * self::CHUNK_SIZE;
-                $lng = $ny * self::CHUNK_SIZE;
+            if (!$existing) {
+                $this->logger->info(sprintf(
+                    '[WorldExpansion] Voisin vide : bbox %s',
+                    $this->bboxKey($bbox)
+                ));
 
-                $generatedRoads = $this->generateChunkService->generate($lat, $lng);
+                $generatedRoads = $this->generateChunkService->generate($bbox['latMin'], $bbox['lngMin']);
 
                 if (count($generatedRoads) > 0) {
-                    $this->logger->info("[WorldExpansion] ✅ {$neighborChunkId} généré avec " . count($generatedRoads) . " routes.");
+                    $this->logger->info(sprintf(
+                        '[WorldExpansion] ✅ %s généré avec %d routes.',
+                        $this->bboxKey($bbox),
+                        count($generatedRoads)
+                    ));
                     return true;
                 }
 
-                $this->logger->warning("[WorldExpansion] ⚠️ {$neighborChunkId} sans routes générées.");
+                $this->logger->warning(sprintf(
+                    '[WorldExpansion] ⚠️ %s sans routes générées.',
+                    $this->bboxKey($bbox)
+                ));
             }
         }
 
-        $this->logger->info('[WorldExpansion] Aucun voisin vide pour ' . $populatedChunk->getChunkId());
+        $this->logger->info(sprintf(
+            '[WorldExpansion] Aucun voisin vide pour chunk %s.',
+            $seedChunk->getId()
+        ));
         return false;
+    }
+
+    private function bboxKey(array $bbox): string
+    {
+        return sprintf('%s,%s', $bbox['latMin'], $bbox['lngMin']);
     }
 }

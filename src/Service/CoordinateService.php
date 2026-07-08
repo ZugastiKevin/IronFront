@@ -5,16 +5,11 @@ namespace App\Service;
 class CoordinateService
 {
     private const EARTH_RADIUS_METERS = 6371000;
-    private const CHUNK_SIZE_DIVIDER = 100;
+
+    public const CHUNK_SIZE = 0.01;
 
     /**
      * Calcule la distance en mètres entre deux points GPS en utilisant la formule Haversine.
-     *
-     * @param float $lat1 Latitude du point 1
-     * @param float $lon1 Longitude du point 1
-     * @param float $lat2 Latitude du point 2
-     * @param float $lon2 Longitude du point 2
-     * @return float La distance en mètres
      */
     public function distance(float $lat1, float $lon1, float $lat2, float $lon2): float
     {
@@ -32,14 +27,37 @@ class CoordinateService
     }
 
     /**
-     * Génère un identifiant de chunk unique basé sur les coordonnées GPS.
+     * Retourne la bounding box (grille CHUNK_SIZE × CHUNK_SIZE) pour un point GPS.
      *
-     * @param float $lat Latitude
-     * @param float $lng Longitude
-     * @return string L'identifiant du chunk (ex: "4885_234")
+     * Utilise floor(lat / CHUNK_SIZE) — la même formule que la génération Overpass,
+     * pour garantir la cohérence front/back.
+     *
+     * @return array{latMin: float, lngMin: float, latMax: float, lngMax: float}
      */
-    public function getChunkId(float $lat, float $lng): string
+    public function getBoundingBox(float $lat, float $lng): array
     {
-        return (int)floor(round($lat * self::CHUNK_SIZE_DIVIDER, 6)). '_' .(int)floor(round($lng * self::CHUNK_SIZE_DIVIDER, 6));
+        $x = floor($lat / self::CHUNK_SIZE);
+        $y = floor($lng / self::CHUNK_SIZE);
+
+        return [
+            'latMin' => (float) round($x * self::CHUNK_SIZE, 8),
+            'lngMin' => (float) round($y * self::CHUNK_SIZE, 8),
+            'latMax' => (float) round(($x + 1) * self::CHUNK_SIZE, 8),
+            'lngMax' => (float) round(($y + 1) * self::CHUNK_SIZE, 8),
+        ];
+    }
+
+    /**
+     * Clé stable utilisée pour indexer le cache (cohérente front/back).
+     */
+    public function bboxKey(array $bbox): string
+    {
+        return sprintf(
+            '%s_%s_%s_%s',
+            (string) $bbox['latMin'],
+            (string) $bbox['lngMin'],
+            (string) $bbox['latMax'],
+            (string) $bbox['lngMax']
+        );
     }
 }
