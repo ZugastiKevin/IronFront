@@ -33,13 +33,11 @@ class FactionGameChoiceType extends AbstractType
                 'choice_attr' => function (Faction $faction) {
                     return [
                         'data-description' => $faction->getDescription() ?? '',
+                        'data-code'        => $faction->getCode(),
                     ];
                 },
                 'expanded' => true,
                 'multiple' => false,
-                // Non requis ici : un player existant sur la game choisie n'a pas besoin de faction.
-                // La présence de la faction est vérifiée manuellement dans le controller
-                // uniquement quand un nouveau player doit être créé.
                 'required' => false,
                 'mapped' => false,
                 'data' => $options['faction_data'] ?? null,

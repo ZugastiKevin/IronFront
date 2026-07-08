@@ -9,6 +9,10 @@ import { loadBuildingsFromData, setCurrentPlayerId } from '../buildings/building
 
 import { initDepositLayers, depositLayers } from './deposits/deposits.js';
 import { initFogOfWar } from './fogOfWar.js';
+import { initZoneDebugPanel } from './roads/zoneDebugPanel.js';
+import { initWorldExpansionProgressPanel } from './worldExpansionProgressPanel.js';
+import { syncKnownZones } from './roads/zoneSync.js';
+import { roadsLayer } from './roads/roadsLayer.js';
 
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -34,11 +38,45 @@ export async function initMap(lat, lng) {
     // Événement personnalisé pour signaler que la carte est prête
     mapInstance.fire('mapReady');
 
-    const layersControl = L.control.layers(null, {
-        "Chunk Grid": gridLayer
-    }).addTo(mapInstance);
+    // Les couches admin (routes possédées + chunk grid) ne sont visibles que pour les admins
+    const isAdmin = window.IS_ADMIN === true;
 
+    if (isAdmin) {
+        roadsLayer.addTo(mapInstance);
+    }
+
+    // Couches de base : dépôts (visibles pour tout le monde) + chunk grid (admin seulement)
+    const baseOverlays = {};
+
+    if (isAdmin) {
+        baseOverlays["Chunk Grid"] = gridLayer;
+    }
+
+    const layersControl = L.control.layers(null, baseOverlays).addTo(mapInstance);
+
+    // Initialise les couches de dépôts (visibles pour tout le monde)
     await initDepositLayers(mapInstance, layersControl);
+
+    // Ajoute la couche routes possédées (admin seulement)
+    if (isAdmin) {
+        layersControl.addOverlay(roadsLayer, "Routes possédées");
+    }
+
+    // Panneau de debug des zones
+    initZoneDebugPanel();
+
+    // Panneau de progression de l'expansion (admin seulement)
+    if (isAdmin) {
+        initWorldExpansionProgressPanel();
+    }
+
+    // Charge la liste des zones en base pour l'overlay "non fetché"
+    syncKnownZones().then(async (count) => {
+        debugLog("zones", `${count} zones synchronisées depuis la base`);
+        // Re-colore le grid si déjà initialisé
+        const { refreshGridColors } = await import('../Layers/gridLayer.js');
+        refreshGridColors();
+    });
 
     // =====================
     // CENTRAL CHUNK CONTROLLER

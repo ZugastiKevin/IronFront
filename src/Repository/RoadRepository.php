@@ -2,7 +2,6 @@
 
 namespace App\Repository;
 
-use App\Entity\Chunk;
 use App\Entity\Road;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -18,20 +17,24 @@ class RoadRepository extends ServiceEntityRepository
     }
 
     /**
-     * Trouve toutes les routes appartenant à un chunk spécifique
+     * Trouve toutes les routes dont la bounding box chevauche la bbox donnée.
      *
-     * @param Chunk $chunk
-     * @return array
+     * Test standard d'overlap : A chevauche B si
+     *   A.latMax >= B.south AND A.latMin <= B.north
+     *   AND A.lngMax >= B.west AND A.lngMin <= B.east
      */
-    public function findByChunk(Chunk $chunk)
+    public function findByBbox(float $south, float $west, float $north, float $east): array
     {
-        return $this->findBy([
-            'chunk' => $chunk
-        ]);
+        return $this->createQueryBuilder('r')
+            ->where('r.bboxLatMax >= :south')->setParameter('south', $south)
+            ->andWhere('r.bboxLatMin <= :north')->setParameter('north', $north)
+            ->andWhere('r.bboxLngMax >= :west')->setParameter('west', $west)
+            ->andWhere('r.bboxLngMin <= :east')->setParameter('east', $east)
+            ->getQuery()->getResult();
     }
 
     /**
-     * Trouve toutes les routes avec leurs points
+     * Trouve toutes les routes avec leurs points.
      */
     public function findAllWithPoints(): array
     {

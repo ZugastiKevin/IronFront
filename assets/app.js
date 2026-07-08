@@ -9,7 +9,7 @@ import '@fortawesome/fontawesome-free/js/all.js';
 import './styles/app.scss';
 
 import './scripts/layout/dropdown.js';
-import './scripts/layout/switch_layout.js';
+import './scripts/layout/switch_layout_sidebar.js';
 import './scripts/security/form.js';
 import './scripts/security/remember_me.js';
 import './scripts/security/reset-btn.js';

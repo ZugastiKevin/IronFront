@@ -16,11 +16,13 @@ use App\Repository\DeliveryRepository;
 use App\Repository\GameResourceDepositRepository;
 use App\Repository\ResourceDepositRepository;
 use App\Repository\ResourceTypeRepository;
+use App\Repository\RoadRepository;
 use App\Service\CoordinateService;
 use App\Service\Game\Building\BuildingService;
 use App\Service\Game\Building\EnemyBaseService;
 use App\Service\Game\CurrentPlayer;
 use App\Service\Game\WorldStateService;
+use App\Service\Game\Generate\ContinentalExpansionManager;
 use App\Service\Game\Generate\GenerateChunkService;
 use App\Service\Game\Road\RoadService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -169,8 +171,8 @@ final class GameApiController extends AbstractController
         }
 
         // 4. Persistance du bâtiment
-        $chunkId = $this->coordinateService->getChunkId($lat, $lng);
-        $chunk = $chunkRepo->findOrCreate($chunkId);
+        $bbox  = $this->coordinateService->getBoundingBox($lat, $lng);
+        $chunk = $chunkRepo->findOrCreateByBbox($bbox);
 
         $building = new Building();
         $building->setPlayer($player);
@@ -211,13 +213,18 @@ final class GameApiController extends AbstractController
 
         $em->flush();
 
-        // Invalider le cache pour ce chunk
-        $cacheKey = self::CACHE_VERSION . '_chunk_' . str_replace(['{', '}', '(', ')', '/', '\\', '@', ':'], '_', $chunk->getChunkId());
+        // Invalider le cache pour cette bbox
+        $cacheKey = self::CACHE_VERSION . '_bbox_' . $this->coordinateService->bboxKey($bbox);
         $gameCache->delete($cacheKey);
 
         return $this->json([
             'status' => 'ok',
-            'chunkId' => $chunk->getChunkId(),
+            'chunk' => [
+                'latMin' => $bbox['latMin'],
+                'lngMin' => $bbox['lngMin'],
+                'latMax' => $bbox['latMax'],
+                'lngMax' => $bbox['lngMax'],
+            ],
             'refreshSidebar' => true,
             'baseCoords' => [
                 'lat' => $lat,
@@ -234,11 +241,9 @@ final class GameApiController extends AbstractController
         Request $request,
         BuildingRepository $buildingRepo
     ): JsonResponse {
-        $data = json_decode($request->getContent(), true);
-        $chunkIds = $data['chunks'] ?? [];
+        $bbox = $this->parseBbox($request);
 
-        // Récupérer uniquement les bâtiments dans ces chunks
-        $buildings = $buildingRepo->findBy(['chunk' => $chunkIds]);
+        $buildings = $buildingRepo->findByBbox($bbox['south'], $bbox['west'], $bbox['north'], $bbox['east']);
 
         $result = [];
         foreach ($buildings as $building) {
@@ -251,7 +256,65 @@ final class GameApiController extends AbstractController
             ];
         }
 
-        return $this->json($result);
+        return $this->json(['buildings' => $result]);
+    }
+
+    // -------------------------
+    // ZONE GENERATE (force une zone précise)
+    // -------------------------
+    #[Route('/api/zones/generate', methods: ['POST'])]
+    public function generateZone(
+        Request $request,
+        GenerateChunkService $generator,
+        CurrentPlayer $currentPlayer,
+    ): JsonResponse {
+        $player = $currentPlayer->get();
+        if (!$player) {
+            throw $this->createAccessDeniedException();
+        }
+
+        $bbox = $this->parseBbox($request);
+        $lat = ($bbox['south'] + $bbox['north']) / 2;
+        $lng = ($bbox['west'] + $bbox['east']) / 2;
+
+        $roads = $generator->generate($lat, $lng);
+
+        return $this->json([
+            'status'       => 'ok',
+            'roads_created' => count($roads),
+            'bbox'         => $bbox,
+        ]);
+    }
+
+    // -------------------------
+    // ZONES STATUS (debug / panneau)
+    // -------------------------
+    #[Route('/api/zones/status', methods: ['GET'])]
+    public function getZonesStatus(ChunkRepository $chunkRepo): JsonResponse
+    {
+        $chunks = $chunkRepo->createQueryBuilder('c')
+            ->select('c.id', 'c.latMin', 'c.lngMin', 'c.latMax', 'c.lngMax', 'c.updatedAt')
+            ->getQuery()->getResult();
+
+        $zones = array_map(fn($c) => [
+            'id'        => $c['id'],
+            'latMin'    => (float) $c['latMin'],
+            'lngMin'    => (float) $c['lngMin'],
+            'latMax'    => (float) $c['latMax'],
+            'lngMax'    => (float) $c['lngMax'],
+            'updatedAt' => $c['updatedAt']?->format('c'),
+        ], $chunks);
+
+        // Set des bboxKeys pour une recherche rapide côté front
+        $bboxKeys = array_map(fn($c) => sprintf('%s_%s',
+            (float) $c['latMin'],
+            (float) $c['lngMin']
+        ), $chunks);
+
+        return $this->json([
+            'zones'   => $zones,
+            'bboxKeys' => $bboxKeys,
+        ]);
     }
 
     // -------------------------
@@ -270,24 +333,19 @@ final class GameApiController extends AbstractController
     }
 
     #[Route('/api/chunks/bulk', methods: ['POST'])]
-    public function getChunksBulk(Request $request, ChunkRepository $chunkRepo): JsonResponse {
-        $data = json_decode($request->getContent(), true);
-        $chunkIds = $data['chunks'] ?? [];
-        
-        $chunks = $chunkRepo->findBy(['chunkId' => $chunkIds]); // Find simple
+    public function getChunksBulk(Request $request, RoadRepository $roadRepo): JsonResponse
+    {
+        $bbox = $this->parseBbox($request);
 
-        $result = [];
-        foreach ($chunks as $chunk) {
-            $roads = [];
-            foreach ($chunk->getRoads() as $road) {
-                $roads[] = [
-                    'points' => $road->getPoints(),
-                    'type' => $road->getType(),
-                ];
-            }
-            $result[$chunk->getChunkId()] = ['roads' => $roads];
-        }
-        return $this->json($result);
+        $roads = $roadRepo->findByBbox($bbox['south'], $bbox['west'], $bbox['north'], $bbox['east']);
+
+        return $this->json([
+            'roads' => array_map(fn($r) => [
+                'id'     => $r->getId(),
+                'points' => $r->getPoints(),
+                'type'   => $r->getType(),
+            ], $roads),
+        ]);
     }
 
     #[Route('/api/add-roads-chunk', methods: ['POST'])]
@@ -296,21 +354,44 @@ final class GameApiController extends AbstractController
         GenerateChunkService $generator
     ): JsonResponse {
 
-        $data = json_decode($request->getContent(), true);
+        try {
+            $data = json_decode($request->getContent(), true);
 
-        $lat = (float) ($data['lat'] ?? 0);
-        $lng = (float) ($data['lng'] ?? 0);
+            $lat = (float) ($data['lat'] ?? 0);
+            $lng = (float) ($data['lng'] ?? 0);
+            $radius = (float) ($data['radius'] ?? 200.0);
 
-        if (!$lat || !$lng) {
-            return $this->json(['error' => 'Invalid data'], 400);
+            if (!$lat || !$lng) {
+                return $this->json(['error' => 'Invalid data'], 400);
+            }
+
+            $result = $generator->addRoadsChunk($lat, $lng);
+
+            return $this->json([
+                'status' => 'ok',
+                'roads_created' => $result['roads_created'],
+                'roads' => array_map(fn($r) => [
+                    'id' => $r->getId(),
+                    'points' => $r->getPoints(),
+                    'type' => $r->getType(),
+                ], $result['roads']),
+            ]);
+        } catch (\Throwable $e) {
+            return $this->json([
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ], 500);
         }
+    }
 
-        $roads = $generator->generate($lat, $lng);
-
-        return $this->json([
-            'status' => 'ok',
-            'roads_created' => count($roads)
-        ]);
+    // -------------------------
+    // WORLD EXPANSION
+    // -------------------------
+    #[Route('/api/world-expansion/status', name: 'api_world_expansion_status', methods: ['GET'])]
+    public function worldExpansionStatus(
+        ContinentalExpansionManager $manager,
+    ): JsonResponse {
+        return $this->json($manager->getStats());
     }
 
     #[Route('/api/building-types', name: 'api_building_types', methods: ['GET'])]
@@ -328,8 +409,11 @@ final class GameApiController extends AbstractController
         ], $types));
     }
 
-    #[Route('/api/deposits/{chunkId}', methods: ['GET'], requirements: ['chunkId' => '-?\d+_-?\d+'])]
-    public function getDeposits(string $chunkId, ResourceDepositRepository $depositRepo, ChunkRepository $chunkRepo, CurrentPlayer $currentPlayer, GameResourceDepositRepository $gameDepositRepo): JsonResponse
+    /**
+     * @deprecated Utiliser POST /api/deposits/bulk avec une bbox
+     */
+    #[Route('/api/deposits/legacy/{chunkId}', methods: ['GET'], requirements: ['chunkId' => '-?\d+_-?\d+'])]
+    public function getDepositsLegacy(string $chunkId, ResourceDepositRepository $depositRepo, CurrentPlayer $currentPlayer, GameResourceDepositRepository $gameDepositRepo): JsonResponse
     {
         $player = $currentPlayer->get();
         if (!$player) {
@@ -341,11 +425,20 @@ final class GameApiController extends AbstractController
             return $this->json([]);
         }
 
-        // Il faut retrouver le chunk par son ID pour filtrer les dépôts via les routes
-        $chunk = $chunkRepo->findOneBy(['chunkId' => $chunkId]);
-        if (!$chunk) return $this->json([]);
+        // Reconstruire une bbox à partir du chunkId "X_Y"
+        $parts = explode('_', $chunkId);
+        if (count($parts) !== 2 || !is_numeric($parts[0]) || !is_numeric($parts[1])) {
+            return $this->json([]);
+        }
 
-        $deposits = $depositRepo->findBy(['road' => $chunk->getRoads()->toArray()]);
+        $x = (int) $parts[0];
+        $y = (int) $parts[1];
+        $size = CoordinateService::CHUNK_SIZE;
+
+        $deposits = $depositRepo->findByBbox(
+            $x * $size, $y * $size,
+            ($x + 1) * $size, ($y + 1) * $size
+        );
 
         return $this->json(array_map(fn($d) => [
             'id' => $d->getId(),
@@ -397,6 +490,27 @@ final class GameApiController extends AbstractController
     }
 
     /**
+     * Extrait une bounding box du body JSON.
+     *
+     * Accepte :
+     *   - { "south": ..., "west": ..., "north": ..., "east": ... }
+     *   - { "bbox": { "south": ..., ... } }
+     *
+     * @return array{south: float, west: float, north: float, east: float}
+     */
+    private function parseBbox(Request $request): array
+    {
+        $data = json_decode($request->getContent(), true) ?? [];
+
+        $south = (float) ($data['south'] ?? $data['bbox']['south'] ?? 0);
+        $west  = (float) ($data['west']  ?? $data['bbox']['west']  ?? 0);
+        $north = (float) ($data['north'] ?? $data['bbox']['north'] ?? 0);
+        $east  = (float) ($data['east']  ?? $data['bbox']['east']  ?? 0);
+
+        return compact('south', 'west', 'north', 'east');
+    }
+
+    /**
      * Récupère les coûts de construction pour l'extracteur d'un type de ressource.
      * Retourne un tableau avec code, label et quantité pour chaque ressource.
      */
@@ -430,13 +544,11 @@ final class GameApiController extends AbstractController
         }
 
         try {
-            $chunks = json_decode($request->getContent(), true)['chunks'] ?? [];
-            $result = [];
+            $bbox = $this->parseBbox($request);
+            $deposits = $depositRepo->findByBbox($bbox['south'], $bbox['west'], $bbox['north'], $bbox['east']);
 
-            foreach ($chunks as $chunkId) {
-                $deposits = $depositRepo->findByChunkId($chunkId);
-
-                $result[$chunkId] = array_map(fn($d) => [
+            return $this->json([
+                'deposits' => array_map(fn($d) => [
                     'id'             => $d->getId(),
                     'resource_type' => $d->getResourceType()?->getCode()?->value ?? 'unknown',
                     'resource_label' => $d->getResourceType()?->getLabel() ?? 'unknown',
@@ -445,10 +557,8 @@ final class GameApiController extends AbstractController
                     'latitude'       => $d->getLatitude(),
                     'longitude'      => $d->getLongitude(),
                     'is_claimed'     => $gameDepositRepo->isCaptured($game, $d),
-                ], $deposits);
-            }
-
-            return new JsonResponse($result);
+                ], $deposits),
+            ]);
         } catch (\Exception $e) {
             return $this->json(['error' => $e->getMessage()], 500);
         }

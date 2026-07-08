@@ -171,4 +171,20 @@ class BuildingRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Trouve les bâtiments dans une bounding box.
+     */
+    public function findByBbox(float $south, float $west, float $north, float $east): array
+    {
+        return $this->createQueryBuilder('b')
+            ->where('b.latitudeBuild >= :south')->andWhere('b.latitudeBuild <= :north')
+            ->andWhere('b.longitudeBuild >= :west')->andWhere('b.longitudeBuild <= :east')
+            ->setParameter('south', $south)
+            ->setParameter('west', $west)
+            ->setParameter('north', $north)
+            ->setParameter('east', $east)
+            ->getQuery()
+            ->getResult();
+    }
 }

@@ -10,6 +10,23 @@ let buildingMarkers = new Map();
 // Cache des popups déjà chargés
 let popupContentLoaded = new Set();
 
+// ID du jouactif (utilisé pour filtrer les bâtiments "à moi")
+let currentPlayerId = null;
+
+/**
+ * Définit l'ID du joueur actif.
+ */
+export function setCurrentPlayerId(id) {
+    currentPlayerId = id;
+}
+
+/**
+ * Retourne l'ID du joueur actif.
+ */
+export function getCurrentPlayerId() {
+    return currentPlayerId;
+}
+
 /**
  * Charge les bâtiments sur la carte avec leurs popups interactifs
  * @param {Array} buildings - Liste des bâtiments à afficher

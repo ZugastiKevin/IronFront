@@ -15,6 +15,38 @@ parameters:
     site.email: 'contact@monsite.fr'
     app.front_debug: '%env(bool:FRONT_DEBUG)%'
 
+    # --- OSM / Geofabrik ---
+    # Dossier contenant les .osm.pbf Geofabrik (téléchargés manuellement)
+    osm.pbf_dir: 'D:/osm'
+    # Binaire osmium (conda). Chemin absolu pour WAMP (pas dans le PATH).
+    osm.osmium_binary: 'C:\Users\rocha\miniconda3\Library\bin\osmium.exe'
+    # Régions Geofabrik : nom => {file, bbox englobante {s,w,n,e}}
+    osm.regions:
+        africa:
+            file: 'africa-260627.osm.pbf'
+            bbox: { s: -36.0, w: -18.0, n: 38.0, e: 52.0 }
+        antarctica:
+            file: 'antarctica-260627.osm.pbf'
+            bbox: { s: -90.0, w: -180.0, n: -60.0, e: 180.0 }
+        asia:
+            file: 'asia-260627.osm.pbf'
+            bbox: { s: -12.0, w: 25.0, n: 78.0, e: 180.0 }
+        australia_oceania:
+            file: 'australia-oceania-260627.osm.pbf'
+            bbox: { s: -50.0, w: 110.0, n: 0.0, e: 180.0 }
+        central_america:
+            file: 'central-america-260627.osm.pbf'
+            bbox: { s: 4.0, w: -119.0, n: 33.0, e: -59.0 }
+        europe:
+            file: 'europe-latest.osm.pbf'
+            bbox: { s: 35.0, w: -25.0, n: 72.0, e: 45.0 }
+        north_america:
+            file: 'north-america-latest.osm.pbf'
+            bbox: { s: 4.0, w: -168.0, n: 84.0, e: -52.0 }
+        south_america:
+            file: 'south-america-260627.osm.pbf'
+            bbox: { s: -57.0, w: -82.0, n: 14.0, e: -34.0 }
+
 services:
     # default configuration for services in *this* file
     _defaults:
@@ -47,10 +79,26 @@ services:
     # Event Publisher
     App\Domain\Events\EventPublisher: '@App\Infrastructure\DatabaseEventPublisher'
 
-    App\Command\RunExpansionLoopCommand:
-        arguments:
-            $cache: '@cache.app'
-
     App\Command\WorldExpansionCommand:
+        autowire: true
+
+    # Commande d'import des routes Geofabrik dans MySQL (INSERT bruts DBAL)
+    App\Command\OsmImportCommand:
         arguments:
-            $cache: '@cache.app'
+            $pbfDir: '%osm.pbf_dir%'
+            $osmiumBinary: '%osm.osmium_binary%'
+            $osmRegions: '%osm.regions%'
+
+    # Commande de génération des chunks et deposits à partir des routes importées
+    App\Command\GenerateDepositsCommand:
+        autowire: true
+
+    # GeofabrikRoadProvider utilise MySQL spatial
+    App\Service\Game\Generate\GeofabrikRoadProvider:
+        arguments:
+            $pdo: '@doctrine.dbal.default_connection'
+
+    # Gestionnaire de checkpoints pour reprise après crash
+    App\Service\Game\Road\ImportCheckpointManager:
+        arguments:
+            $roadRepository: '@App\Repository\RoadRepository'

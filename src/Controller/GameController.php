@@ -35,6 +35,11 @@ final class GameController extends AbstractController
             return $this->redirectToRoute('login');
         }
 
+        $existingPlayers = [];
+        foreach ($user->getPlayers() as $player) {
+            $existingPlayers[$player->getGame()->getId()] = $player->getFaction()->getCode();
+        }
+
         $form = $this->createForm(FactionGameChoiceType::class);
         $form->handleRequest($request);
 
@@ -64,7 +69,7 @@ final class GameController extends AbstractController
                 return $this->render('game/choose_faction.html.twig', [
                     'form' => $form->createView(),
                     'activeGames' => $activeGames,
-                    'existingPlayers' => $user->getPlayers(),
+                    'existingPlayers' => $existingPlayers,
                 ]);
             }
 
@@ -91,7 +96,7 @@ final class GameController extends AbstractController
         return $this->render('game/choose_faction.html.twig', [
             'form' => $form->createView(),
             'activeGames' => $activeGames,
-            'existingPlayers' => $user->getPlayers(),
+            'existingPlayers' => $existingPlayers,
         ]);
     }
 

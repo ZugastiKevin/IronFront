@@ -6,6 +6,25 @@ import { debugLog, debugWarn, debugError } from '../../../utils/debug.js';
 import { roadsState } from './roadsState.js';
 import { renderDepositsFromData } from '../deposits/deposits.js';
 import { getCachedChunk, setCachedChunk, invalidateChunkCache } from './chunkCache.js';
+import { drawOwnedRoads } from './roadsLayer.js';
+
+// ==========================
+// SAFE JSON PARSE
+// ==========================
+// Parse le JSON d'une réponse en renvoyant TOUJOURS du JSON valide.
+// Si le corps n'est du JSON (page d'erreur HTML, 500, 404, vide),
+// le texte brut est loggé pour diagnostic et un objet par défaut
+// est retourné pour éviter le crash "JSON.parse: unexpected character".
+async function safeJson(response, defaultData) {
+    const text = await response.text();
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        debugError("roads", `[SAFE_JSON] Réponse non-JSON (status ${response.status} ${response.url}):`,
+            text.slice(0, 500));
+        return defaultData;
+    }
+}
 
 // ==========================
 // MAIN LOAD VISIBLE
@@ -48,55 +67,87 @@ export async function loadVisibleRoadChunks() {
         return;
     }
 
+    // La bbox englobante des chunks visibles
+    const visibleBounds = {
+        south: bounds.getSouth(),
+        west:  bounds.getWest(),
+        north: bounds.getNorth(),
+        east:  bounds.getEast(),
+    };
+
     try {
         const [roadsResponse, buildingsResponse, depositsResponse] = await Promise.all([
             fetch('/api/chunks/bulk', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chunks: finalChunksToLoad })
+                body: JSON.stringify(visibleBounds),
             }),
             fetch('/api/buildings/visible', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chunks: finalChunksToLoad })
+                body: JSON.stringify(visibleBounds),
             }),
             fetch('/api/deposits/bulk', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chunks: finalChunksToLoad })
-            })
+                body: JSON.stringify(visibleBounds),
+            }),
         ]);
 
-        if (!roadsResponse.ok || !buildingsResponse.ok || !depositsResponse.ok) {
-            throw new Error("API error");
-        }
+        // On parse en tolérant une réponse non-JSON (page d'erreur HTML 500/404…)
+        // pour éviter "JSON.parse: unexpected character" et logger le corps brut.
+        const roadsData     = await safeJson(roadsResponse, { roads: [] });
+        const buildingsData = await safeJson(buildingsResponse, { buildings: [] });
+        const depositsData  = await safeJson(depositsResponse, { deposits: [] });
 
-        const roadsData     = await roadsResponse.json();
-        const buildingsData = await buildingsResponse.json();
-        const depositsData  = await depositsResponse.json();
+        // Nouveau format : tableaux plats dans $.roads, $.buildings, $.deposits
+        const allRoads     = roadsData.roads || [];
+        const allBuildings = buildingsData.buildings || [];
+        const allDeposits  = depositsData.deposits || [];
 
+        // Distribue les routes dans les cellules visibles (une route peut toucher plusieurs cellules)
         for (const chunkId of finalChunksToLoad) {
-            const chunkData = {
-                roads:     roadsData[chunkId]?.roads     || [],
-                buildings: buildingsData[chunkId]?.buildings || [],
-                deposits:  depositsData[chunkId] || []
-            };
+            const [cxStr, cyStr] = chunkId.split('_');
+            // Le chunkId est "latMin_lngMin" où latMin/lngMin sont des floats (ex: "45.16_0.76").
+            // Utiliser parseFloat / CHUNK_SIZE pour obtenir l'entier de grille (ex: 4516, 76).
+            const cx = Math.round(parseFloat(cxStr) / CHUNK_SIZE);
+            const cy = Math.round(parseFloat(cyStr) / CHUNK_SIZE);
+            if (Number.isNaN(cx) || Number.isNaN(cy)) continue;
 
-            const hasRoads = chunkData.roads.length > 0;
+            // Normaliser la bbox avec toFixed(8) pour éviter les erreurs de précision floats
+            const cellSouth = Number((cx * CHUNK_SIZE).toFixed(8));
+            const cellWest  = Number((cy * CHUNK_SIZE).toFixed(8));
+            const cellNorth = Number((cellSouth + CHUNK_SIZE).toFixed(8));
+            const cellEast  = Number((cellWest + CHUNK_SIZE).toFixed(8));
+
+            const cellRoads = allRoads.filter(road =>
+                Array.isArray(road.points) && road.points.some(pt =>
+                    pt[0] >= cellSouth && pt[0] <= cellNorth &&
+                    pt[1] >= cellWest  && pt[1] <= cellEast
+                )
+            );
+
+            const isEmpty = allRoads.length === 0 && allBuildings.length === 0 && allDeposits.length === 0;
+            const status = isEmpty ? 'empty' : 'loaded';
 
             roadsState.chunks[chunkId] = {
-                status: hasRoads ? 'loaded' : 'empty',
-                ...chunkData,
-                hasRoads
+                status,
+                roads:     cellRoads,
+                buildings: allBuildings,
+                deposits:  allDeposits,
+                hasRoads:  cellRoads.length > 0,
             };
 
             roadsState.loadedChunks.add(chunkId);
-            setCachedChunk(chunkId, { ...chunkData, hasRoads });
+            setCachedChunk(chunkId, { roads: cellRoads, buildings: allBuildings, deposits: allDeposits, hasRoads: cellRoads.length > 0 });
 
-            setChunkColor(chunkId, hasRoads ? 'blue' : '#444');
-            renderDepositsFromData(chunkData.deposits, map);
+            setChunkColor(chunkId, isEmpty ? '#444' : 'blue');
+            renderDepositsFromData(allDeposits, map);
 
-            debugLog("roads", `Chunk ${chunkId} chargé (${chunkData.roads.length} routes, ${chunkData.deposits.length} dépôts)`);
+            // Dessine les routes possédées sur la carte (seules les routes de CE chunk)
+            drawOwnedRoads(cellRoads);
+
+            debugLog("roads", `[LOAD] ${chunkId}: ${status} (${cellRoads.length} routes ici, ${allRoads.length} total)`);
         }
 
     } catch (error) {
@@ -123,6 +174,14 @@ export async function refreshChunk(chunkId) {
 }
 
 // ==========================
+// REFRESH MULTIPLE CHUNKS
+// ==========================
+export async function refreshChunks(chunkIds) {
+    if (!Array.isArray(chunkIds) || chunkIds.length === 0) return;
+    await Promise.all(chunkIds.map(id => refreshChunk(id)));
+}
+
+// ==========================
 // FETCH SINGLE CHUNK
 // ==========================
 async function fetchSingleChunk(chunkId) {
@@ -130,45 +189,64 @@ async function fetchSingleChunk(chunkId) {
         roadsState.chunks[chunkId] = { status: 'loading', roads: [], buildings: [], deposits: [] };
         setChunkColor(chunkId, 'orange');
 
+        // Déduire une bbox du chunkId "latMin_lngMin" (ex: "45.16_0.76")
+        // Utiliser parseFloat / CHUNK_SIZE pour obtenir l'entier de grille (ex: 4516, 76).
+        const [cxStr, cyStr] = chunkId.split('_');
+        const cx = Math.round(parseFloat(cxStr) / CHUNK_SIZE);
+        const cy = Math.round(parseFloat(cyStr) / CHUNK_SIZE);
+        const cellSouth = Number((cx * CHUNK_SIZE).toFixed(8));
+        const cellWest  = Number((cy * CHUNK_SIZE).toFixed(8));
+        const cellNorth = Number((cellSouth + CHUNK_SIZE).toFixed(8));
+        const cellEast  = Number((cellWest + CHUNK_SIZE).toFixed(8));
+
         const [roadsRes, buildingsRes, depositsRes] = await Promise.all([
             fetch('/api/chunks/bulk', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chunks: [chunkId] })
+                body: JSON.stringify({ south: cellSouth, west: cellWest, north: cellNorth, east: cellEast }),
             }),
             fetch('/api/buildings/visible', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chunks: [chunkId] })
+                body: JSON.stringify({ south: cellSouth, west: cellWest, north: cellNorth, east: cellEast }),
             }),
             fetch('/api/deposits/bulk', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chunks: [chunkId] })
-            })
+                body: JSON.stringify({ south: cellSouth, west: cellWest, north: cellNorth, east: cellEast }),
+            }),
         ]);
 
-        if (!roadsRes.ok || !buildingsRes.ok || !depositsRes.ok) throw new Error("API error");
+        const roadsData     = await safeJson(roadsRes, { roads: [] });
+        const buildingsData = await safeJson(buildingsRes, { buildings: [] });
+        const depositsData  = await safeJson(depositsRes, { deposits: [] });
 
-        const roadsData     = await roadsRes.json();
-        const buildingsData = await buildingsRes.json();
-        const depositsData  = await depositsRes.json();
+        const allRoads     = roadsData.roads || [];
+        const allBuildings = buildingsData.buildings || [];
+        const allDeposits  = depositsData.deposits || [];
 
-        const chunkData = {
-            roads:     roadsData[chunkId]?.roads     || [],
-            buildings: buildingsData[chunkId]?.buildings || [],
-            deposits:  depositsData[chunkId] || []
-        };
+        // Filtre les routes qui intersectent CE chunk
+        const cellRoads = allRoads.filter(road =>
+            Array.isArray(road.points) && road.points.some(pt =>
+                pt[0] >= cellSouth && pt[0] <= cellNorth &&
+                pt[1] >= cellWest  && pt[1] <= cellEast
+            )
+        );
 
-        const hasRoads = chunkData.roads.length > 0;
+        // Un chunk est "loaded" (bleu) dès que la zone a été fetchée avec succès,
+        // même si les routes sont stockées dans des chunks voisins.
+        // Le statut "empty" (gris) n'apparaît que si l'API confirme qu'il n'y a
+        // strictement aucune route dans la bbox du chunk.
+        const isEmpty = allRoads.length === 0 && allBuildings.length === 0 && allDeposits.length === 0;
+        const status = isEmpty ? 'empty' : 'loaded';
 
-        roadsState.chunks[chunkId] = { status: hasRoads ? 'loaded' : 'empty', ...chunkData, hasRoads };
-        setCachedChunk(chunkId, { ...chunkData, hasRoads });
+        roadsState.chunks[chunkId] = { status, roads: cellRoads, buildings: allBuildings, deposits: allDeposits, hasRoads: cellRoads.length > 0 };
+        setCachedChunk(chunkId, { roads: cellRoads, buildings: allBuildings, deposits: allDeposits, hasRoads: cellRoads.length > 0 });
 
-        setChunkColor(chunkId, hasRoads ? 'blue' : '#444');
-        renderDepositsFromData(chunkData.deposits, getMap());
+        setChunkColor(chunkId, isEmpty ? '#444' : 'blue');
+        renderDepositsFromData(allDeposits, getMap());
 
-        debugLog("roads", "[CHUNK REFRESH]", chunkId, chunkData.roads.length);
+        debugLog("roads", `[CHUNK REFRESH] ${chunkId}: ${status} (${cellRoads.length} routes ici, ${allRoads.length} total dans la bbox)`);
 
     } catch (e) {
         roadsState.chunks[chunkId] = { status: 'error', roads: [], buildings: [], deposits: [] };
@@ -202,7 +280,10 @@ function getVisibleChunks(bounds) {
     const chunks = [];
     for (let x = minX; x <= maxX; x++) {
         for (let y = minY; y <= maxY; y++) {
-            chunks.push(`${x}_${y}`);
+            // Format cohérent avec snapToChunk : "latMin_lngMin" (floats, ex: "45.16_0.76")
+            const latMin = Number((x * CHUNK_SIZE).toFixed(8));
+            const lngMin = Number((y * CHUNK_SIZE).toFixed(8));
+            chunks.push(`${latMin}_${lngMin}`);
         }
     }
     return chunks;

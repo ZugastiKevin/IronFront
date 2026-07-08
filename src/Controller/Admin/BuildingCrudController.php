@@ -63,17 +63,17 @@ class BuildingCrudController extends AbstractCrudController
         if ($entityInstance instanceof Building) {
             $lat = $entityInstance->getLatitudeBuild();
             $lng = $entityInstance->getLongitudeBuild();
-            
-            // Recalcul de l'ID du chunk
-            $chunkId = $this->coordinateService->getChunkId($lat, $lng);
-            
-            // Récupération ou création du Chunk
+
+            // Calcul de la bounding box (grille CHUNK_SIZE × CHUNK_SIZE)
+            $bbox = $this->coordinateService->getBoundingBox($lat, $lng);
+
+            // Récupération ou création du Chunk par bbox
             $chunkRepo = $entityManager->getRepository(Chunk::class);
-            $chunk = $chunkRepo->findOrCreate($chunkId);
-            
+            $chunk = $chunkRepo->findOrCreateByBbox($bbox);
+
             $entityInstance->setChunk($chunk);
         }
-        
+
         parent::updateEntity($entityManager, $entityInstance);
     }
 }
