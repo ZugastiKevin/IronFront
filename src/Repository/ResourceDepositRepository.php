@@ -49,17 +49,4 @@ class ResourceDepositRepository extends ServiceEntityRepository
             ->getResult();
     }
 
-    /**
-     * @deprecated Utiliser findByBbox()
-     */
-    public function findByChunkId(string $chunkId): array
-    {
-        return $this->createQueryBuilder('d')
-            ->join('d.road', 'r')
-            ->join('r.chunk', 'c')
-            ->where('c.chunkId = :chunkId')
-            ->setParameter('chunkId', $chunkId)
-            ->getQuery()
-            ->getResult();
     }
-}

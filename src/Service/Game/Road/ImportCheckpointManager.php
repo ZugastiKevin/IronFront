@@ -4,12 +4,12 @@ namespace App\Service\Game\Road;
 
 use App\Entity\ImportProgress;
 use App\Repository\ImportProgressRepository;
-use App\Repository\RoadRepository;
+use App\Repository\RoadSegmentRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Gestionnaire de checkpoints pour l'import OSM.
+ * Gestionnaire de checkpoints pour l'import OSM (version road_segment).
  * Permet la reprise après crash et la suppression des données partielles.
  */
 class ImportCheckpointManager
@@ -21,7 +21,7 @@ class ImportCheckpointManager
 
     public function __construct(
         private ImportProgressRepository $progressRepository,
-        private RoadRepository $roadRepository,
+        private RoadSegmentRepository $roadSegmentRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
     ) {}
@@ -36,68 +36,54 @@ class ImportCheckpointManager
     {
         $this->logger->info(sprintf('Initialisation checkpoints pour région %s : %d tuiles', $region, count($tiles)));
 
-        $batch = [];
+        // Charge en une seule requête les clés déjà connues (évite N SELECT).
+        $existing = $this->progressRepository->findAllTileKeys($region);
+
+        $count = 0;
 
         foreach ($tiles as $tile) {
             $tileKey = $this->buildTileKey($tile);
-            $existing = $this->progressRepository->findByRegionAndTile($region, $tileKey);
 
-            if ($existing === null) {
-                $progress = new ImportProgress();
-                $progress->setRegion($region);
-                $progress->setTileKey($tileKey);
-                $progress->setStatus(self::STATUS_PENDING);
-
-                $this->em->persist($progress);
-                $batch[] = $progress;
+            if (isset($existing[$tileKey])) {
+                continue;
             }
 
-            // Flush par batches de 100 pour éviter la surcharge mémoire
-            if (count($batch) >= 100) {
+            $progress = new ImportProgress();
+            $progress->setRegion($region);
+            $progress->setTileKey($tileKey);
+            $progress->setStatus(self::STATUS_PENDING);
+
+            $this->em->persist($progress);
+
+            // Flush par lots pour éviter la surcharge mémoire
+            if (++$count % 500 === 0) {
                 $this->em->flush();
                 $this->em->clear();
-                $batch = [];
             }
         }
 
-        if (!empty($batch)) {
-            $this->em->flush();
-        }
+        $this->em->flush();
         $this->em->clear();
     }
 
     /**
-     * Marque le début du traitement d'une tuile.
-     * Retourne true si la tuile doit être ignorée (déjà complétée).
+     * Retourne les clés des tuiles complétées d'une région.
+     *
+     * @return array<string, true>
      */
-    public function startTile(string $region, array $tile): bool
+    public function getCompletedTileKeys(string $region): array
     {
-        $tileKey = $this->buildTileKey($tile);
-        $progress = $this->progressRepository->findByRegionAndTile($region, $tileKey);
+        return $this->progressRepository->findCompletedTileKeys($region);
+    }
 
-        // Cas 1: Tuile déjà complétée → on saute
-        if ($progress !== null && $progress->getStatus() === self::STATUS_COMPLETED) {
-            return true;
-        }
-
-        // Cas 2: Tuile en cours (crash) → on supprime les routes partielles
-        if ($progress !== null && $progress->getStatus() === self::STATUS_PROCESSING) {
-            $this->cleanupPartialTile($tile, $progress->getRoadsImported());
-        }
-
-        // Cas 3: Tuile inexistante → on crée un checkpoint
-        if ($progress === null) {
-            $progress = new ImportProgress();
-            $progress->setRegion($region);
-            $progress->setTileKey($tileKey);
-        }
-
-        $progress->setStatus(self::STATUS_PROCESSING);
-        $progress->setRoadsImported(0);
-        $this->em->persist($progress);
-        $this->em->flush();
-
-        return false;
+    /**
+     * Remet en attente les tuiles restées en 'processing' (arrêt/crash).
+     *
+     * @return int Nombre de tuiles réouvertes
+     */
+    public function resetProcessing(string $region): int
+    {
+        return $this->progressRepository->resetProcessingToPending($region);
     }
 
     /**
@@ -136,29 +122,31 @@ class ImportCheckpointManager
     }
 
     /**
-     * Supprime les routes importées partiellement dans une tuile.
-     * Utilisé quand on reprend après un crash.
+     * Marque une tuile comme en cours de traitement.
+     * Retourne true si la tuile a déjà été traitée (à ignorer).
      */
-    private function cleanupPartialTile(array $tile, int $previousCount): int
+    public function startTile(string $region, array $tile): bool
     {
-        $this->logger->warning(sprintf(
-            'Nettoyage tuile [%F,%F,%F,%F] : %d routes à supprimer',
-            $tile['s'], $tile['w'], $tile['n'], $tile['e'],
-            $previousCount
-        ));
+        $tileKey = $this->buildTileKey($tile);
+        $progress = $this->progressRepository->findByRegionAndTile($region, $tileKey);
 
-        $deleted = $this->roadRepository->createQueryBuilder('r')
-            ->delete()
-            ->where('r.bboxLatMin >= :latMin')->setParameter('latMin', $tile['s'])
-            ->andWhere('r.bboxLatMax <= :latMax')->setParameter('latMax', $tile['n'])
-            ->andWhere('r.bboxLngMin >= :lngMin')->setParameter('lngMin', $tile['w'])
-            ->andWhere('r.bboxLngMax <= :lngMax')->setParameter('lngMax', $tile['e'])
-            ->getQuery()
-            ->execute();
+        // Déjà complétée, ignorer
+        if ($progress !== null && $progress->getStatus() === self::STATUS_COMPLETED) {
+            return true;
+        }
 
-        $this->logger->info(sprintf('Nettoyage terminé : %d routes supprimées', $deleted));
+        // Marquer comme en cours de traitement
+        if ($progress === null) {
+            $progress = new ImportProgress();
+            $progress->setRegion($region);
+            $progress->setTileKey($tileKey);
+        }
 
-        return $deleted;
+        $progress->setStatus(self::STATUS_PROCESSING);
+        $this->em->persist($progress);
+        $this->em->flush();
+
+        return false;
     }
 
     /**

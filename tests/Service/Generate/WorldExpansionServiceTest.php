@@ -72,7 +72,7 @@ final class WorldExpansionServiceTest extends TestCase
             ->expects($this->once())
             ->method('generate')
             ->with($this->anything(), $this->anything())
-            ->willReturn([new \App\Entity\Road()]);
+            ->willReturn([new \stdClass()]);
 
         $result = $this->service->expand();
 

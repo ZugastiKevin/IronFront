@@ -9,7 +9,7 @@ final class NotificationControllerTest extends WebTestCase
     public function testIndex(): void
     {
         $client = static::createClient();
-        $client->request('GET', '/notification');
+        $client->request('GET', '/notifications');
 
         self::assertResponseIsSuccessful();
     }

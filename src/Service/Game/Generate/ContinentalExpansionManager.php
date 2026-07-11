@@ -4,7 +4,7 @@ namespace App\Service\Game\Generate;
 
 use App\Entity\Chunk;
 use App\Repository\ChunkRepository;
-use App\Repository\RoadRepository;
+use App\Repository\RoadSegmentRepository;
 use App\Service\CoordinateService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -32,7 +32,7 @@ class ContinentalExpansionManager
     public function __construct(
         private EntityManagerInterface $em,
         private ChunkRepository $chunkRepository,
-        private RoadRepository $roadRepository,
+        private RoadSegmentRepository $roadSegmentRepository,
         private GenerateChunkService $generateChunkService,
         private CoordinateService $coordinateService,
         private LoggerInterface $logger,

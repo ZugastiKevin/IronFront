@@ -2,7 +2,7 @@
 
 namespace App\Entity;
 
-use App\Entity\Road;
+use App\Entity\RoadSegment;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use App\Repository\ResourceDepositRepository;
@@ -39,9 +39,9 @@ class ResourceDeposit
     #[ORM\Column(type: 'float')]
     private float $richness = 1.0;
 
-    #[ORM\ManyToOne(targetEntity: Road::class, inversedBy: 'deposits')]
-    #[ORM\JoinColumn(nullable: false)]
-    private ?Road $road = null;
+    #[ORM\ManyToOne(targetEntity: RoadSegment::class, inversedBy: 'deposits')]
+    #[ORM\JoinColumn(nullable: true, name: 'road_segment_id')]
+    private ?RoadSegment $roadSegment = null;
 
     #[ORM\OneToMany(targetEntity: GameResourceDeposit::class, mappedBy: 'resourceDeposit', orphanRemoval: true)]
     private Collection $gameResourceDeposits;
@@ -106,14 +106,27 @@ class ResourceDeposit
         return $this;
     }
 
-    public function getRoad(): ?Road
+    // Retour legacy pour compatibilité - à supprimer après migration
+    public function getRoad(): ?RoadSegment
     {
-        return $this->road;
+        return $this->roadSegment;
     }
 
-    public function setRoad(?Road $road): static
+    // Retour legacy pour compatibilité - à supprimer après migration
+    public function setRoad(?RoadSegment $roadSegment): static
     {
-        $this->road = $road;
+        $this->roadSegment = $roadSegment;
+        return $this;
+    }
+
+    public function getRoadSegment(): ?RoadSegment
+    {
+        return $this->roadSegment;
+    }
+
+    public function setRoadSegment(?RoadSegment $roadSegment): static
+    {
+        $this->roadSegment = $roadSegment;
 
         return $this;
     }

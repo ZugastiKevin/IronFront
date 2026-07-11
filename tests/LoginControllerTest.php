@@ -2,10 +2,8 @@
 
 namespace App\Tests;
 
-use App\Entity\User;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class LoginControllerTest extends WebTestCase
 {
@@ -13,27 +11,10 @@ class LoginControllerTest extends WebTestCase
 
     protected function setUp(): void
     {
+        // Le user de test (email@example.com / password) est provisionné par
+        // bin/setup-tests.ps1 (app:seed-test-user). Les fichiers de test
+        // n'écrivent jamais en base.
         $this->client = static::createClient();
-        $container = static::getContainer();
-        $em = $container->get('doctrine.orm.entity_manager');
-        $userRepository = $em->getRepository(User::class);
-
-        // Remove any existing users from the test database
-        foreach ($userRepository->findAll() as $user) {
-            $em->remove($user);
-        }
-
-        $em->flush();
-
-        // Create a User fixture
-        /** @var UserPasswordHasherInterface $passwordHasher */
-        $passwordHasher = $container->get('security.user_password_hasher');
-
-        $user = (new User())->setEmail('email@example.com');
-        $user->setPassword($passwordHasher->hashPassword($user, 'password'));
-
-        $em->persist($user);
-        $em->flush();
     }
 
     public function testLogin(): void
@@ -42,7 +23,7 @@ class LoginControllerTest extends WebTestCase
         $this->client->request('GET', '/login');
         self::assertResponseIsSuccessful();
 
-        $this->client->submitForm('Sign in', [
+        $this->submitLogin([
             '_username' => 'doesNotExist@example.com',
             '_password' => 'password',
         ]);
@@ -51,13 +32,13 @@ class LoginControllerTest extends WebTestCase
         $this->client->followRedirect();
 
         // Ensure we do not reveal if the user exists or not.
-        self::assertSelectorTextContains('.alert-danger', 'Invalid credentials.');
+        self::assertSelectorTextContains('.alert-danger', 'Identifiants invalides.');
 
         // Denied - Can't login with invalid password.
         $this->client->request('GET', '/login');
         self::assertResponseIsSuccessful();
 
-        $this->client->submitForm('Sign in', [
+        $this->submitLogin([
             '_username' => 'email@example.com',
             '_password' => 'bad-password',
         ]);
@@ -66,10 +47,13 @@ class LoginControllerTest extends WebTestCase
         $this->client->followRedirect();
 
         // Ensure we do not reveal the user exists but the password is wrong.
-        self::assertSelectorTextContains('.alert-danger', 'Invalid credentials.');
+        self::assertSelectorTextContains('.alert-danger', 'Identifiants invalides.');
 
         // Success - Login with valid credentials is allowed.
-        $this->client->submitForm('Sign in', [
+        $this->client->request('GET', '/login');
+        self::assertResponseIsSuccessful();
+
+        $this->submitLogin([
             '_username' => 'email@example.com',
             '_password' => 'password',
         ]);
@@ -78,5 +62,17 @@ class LoginControllerTest extends WebTestCase
         $this->client->followRedirect();
 
         self::assertSelectorNotExists('.alert-danger');
+    }
+
+    /**
+     * Soumet le formulaire de login (identifié par son id, le libellé du bouton
+     * étant traduit et non constant).
+     *
+     * @param array<string, string> $fields
+     */
+    private function submitLogin(array $fields): void
+    {
+        $form = $this->client->getCrawler()->filter('form#login-form')->form($fields);
+        $this->client->submit($form);
     }
 }

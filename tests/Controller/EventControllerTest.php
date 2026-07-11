@@ -9,7 +9,7 @@ final class EventControllerTest extends WebTestCase
     public function testIndex(): void
     {
         $client = static::createClient();
-        $client->request('GET', '/event');
+        $client->request('GET', '/events');
 
         self::assertResponseIsSuccessful();
     }

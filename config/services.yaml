@@ -55,6 +55,11 @@ services:
         autowire: true      # Automatically injects dependencies in your services.
         autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
 
+    # Chaque CompilerPhase est taguée pour injection dans WorldCompiler (Open/Closed)
+    _instanceof:
+        App\Service\Osm\CompilerPhase:
+            tags: ['app.osm_compiler_phase']
+
     # makes classes in src/ available to be used as services
     # this creates a service per class whose id is the fully-qualified class name
     App\:
@@ -84,24 +89,48 @@ services:
     App\Command\WorldExpansionCommand:
         autowire: true
 
-    # Commande d'import des routes Geofabrik dans MySQL (SpatiaLite + checkpoint)
-    App\Command\OsmImportCommand:
+    # Commande de compilation OSM (nouvelle architecture)
+    App\Command\WorldCompileCommand:
         arguments:
             $pbfDir: '%osm.pbf_dir%'
             $osmiumBinary: '%osm.osmium_binary%'
-            $ogr2ogrBinary: '%osm.ogr2ogr_binary%'
             $osmRegions: '%osm.regions%'
 
     # Commande de génération des chunks et deposits à partir des routes importées
     App\Command\GenerateDepositsCommand:
         autowire: true
 
-    # GeofabrikRoadProvider utilise MySQL spatial
-    App\Service\Game\Generate\GeofabrikRoadProvider:
-        arguments:
-            $pdo: '@doctrine.dbal.default_connection'
-
     # Gestionnaire de checkpoints pour reprise après crash
     App\Service\Game\Road\ImportCheckpointManager:
         arguments:
-            $roadRepository: '@App\Repository\RoadRepository'
+            $roadSegmentRepository: '@App\Repository\RoadSegmentRepository'
+
+    # --- OSM Pipeline ---
+
+    # Étape 1 : Import brut
+    App\Service\Osm\RawImportService:
+        arguments:
+            $osmiumBinary: '%osm.osmium_binary%'
+
+    # Étape 2 : Normalisation
+    App\Service\Osm\RoadNormalizer: ~
+
+    # Étape 3-4 : Construction du graphe
+    App\Service\Osm\GraphBuilder: ~
+
+    # Étape 5 : Index spatial
+    App\Service\Osm\SpatialIndexer: ~
+
+    # Étape 9 : Gameplay
+    App\Service\Osm\GameplayCompiler: ~
+
+    # Orchestrateur : phases injectées via le tag app.osm_compiler_phase (Open/Closed)
+    App\Service\Osm\WorldCompiler:
+        arguments:
+            $phases: !tagged_iterator app.osm_compiler_phase
+
+    # Provider pour le moteur de jeu
+    App\Service\Osm\RoadProvider: ~
+
+    # Provider indexé
+    App\Service\Game\Generate\RoadIndexProvider: ~

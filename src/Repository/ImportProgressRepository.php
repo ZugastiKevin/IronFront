@@ -43,6 +43,65 @@ class ImportProgressRepository extends ServiceEntityRepository
     }
 
     /**
+     * Récupère toutes les clés de tuiles déjà enregistrées pour une région.
+     *
+     * @return array<string, true> ensemble indexé par tileKey
+     */
+    public function findAllTileKeys(string $region): array
+    {
+        $rows = $this->createQueryBuilder('ip')
+            ->select('ip.tileKey')
+            ->where('ip.region = :region')->setParameter('region', $region)
+            ->getQuery()
+            ->getScalarResult();
+
+        $keys = [];
+        foreach ($rows as $row) {
+            $keys[$row['tileKey']] = true;
+        }
+
+        return $keys;
+    }
+
+    /**
+     * Récupère les clés des tuiles complétées d'une région.
+     *
+     * @return array<string, true> ensemble indexé par tileKey
+     */
+    public function findCompletedTileKeys(string $region): array
+    {
+        $rows = $this->createQueryBuilder('ip')
+            ->select('ip.tileKey')
+            ->where('ip.region = :region')->setParameter('region', $region)
+            ->andWhere('ip.status = :status')->setParameter('status', 'completed')
+            ->getQuery()
+            ->getScalarResult();
+
+        $keys = [];
+        foreach ($rows as $row) {
+            $keys[$row['tileKey']] = true;
+        }
+
+        return $keys;
+    }
+
+    /**
+     * Remet en 'pending' les tuiles restées en 'processing' (crash / arrêt manuel).
+     *
+     * @return int Nombre de tuiles réouvertes
+     */
+    public function resetProcessingToPending(string $region): int
+    {
+        return $this->createQueryBuilder('ip')
+            ->update()
+            ->set('ip.status', ':pending')->setParameter('pending', 'pending')
+            ->where('ip.region = :region')->setParameter('region', $region)
+            ->andWhere('ip.status = :processing')->setParameter('processing', 'processing')
+            ->getQuery()
+            ->execute();
+    }
+
+    /**
      * Supprime les checkpoints d'une région (reset complet).
      */
     public function deleteByRegion(string $region): int

@@ -25,8 +25,13 @@ doctrine:
 when@test:
     doctrine:
         dbal:
-            # "TEST_TOKEN" is typically set by ParaTest
-            dbname_suffix: '_test%env(default::TEST_TOKEN)%'
+            # Base de test isolée (SQLite, fichier en cache) : les tests ne
+            # touchent jamais la base ironfront. Aucune base ironfront_test
+            # n'est créée. Le schéma + le user de test sont chargés par le
+            # script de setup (bin/setup-tests.ps1), jamais depuis un test.
+            url: '%env(resolve:DATABASE_URL)%'
+            server_version: null
+            dbname_suffix: ''
 
 when@prod:
     doctrine:

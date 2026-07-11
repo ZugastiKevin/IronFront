@@ -4,8 +4,6 @@ namespace App\Command;
 
 use App\Service\Game\Generate\ContinentalExpansionManager;
 use App\Service\Game\Generate\GenerateChunkService;
-use App\Service\Game\Generate\OverpassClient;
-use App\Service\Game\Generate\OverpassException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -22,7 +20,6 @@ class WorldExpansionCommand extends Command
     public function __construct(
         private readonly ContinentalExpansionManager $manager,
         private readonly GenerateChunkService $generateChunkService,
-        private readonly OverpassClient $overpassClient,
     ) {
         parent::__construct();
     }
@@ -31,7 +28,6 @@ class WorldExpansionCommand extends Command
     {
         $this
             ->addOption('seed', 's', InputOption::VALUE_REQUIRED, 'Seed initial au format "lat,lng" (ex: 48.8566,2.3522)')
-            ->addOption('throttle', 't', InputOption::VALUE_REQUIRED, 'Secondes entre chaque appel Overpass', 60.0)
             ->addOption('max-chunks', 'm', InputOption::VALUE_REQUIRED, 'Nombre max de chunks par run (0 = illimité)', 0)
             ->addOption('max-failures', 'f', InputOption::VALUE_REQUIRED, 'Échecs consécutifs max avant arrêt', 10)
         ;
@@ -41,14 +37,10 @@ class WorldExpansionCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
 
-        $throttle = (float) $input->getOption('throttle');
         $maxChunks = (int) $input->getOption('max-chunks');
         $maxFailures = (int) $input->getOption('max-failures');
 
-        // 1. Appliquer le throttle
-        $this->overpassClient->setThrottle($throttle);
-
-        // 2. Seed initial si fourni
+        // 1. Seed initial si fourni
         $seed = $input->getOption('seed');
         if ($seed) {
             [$lat, $lng] = explode(',', $seed);
@@ -130,7 +122,11 @@ class WorldExpansionCommand extends Command
                         $stats['empty'] ?? 0
                     ));
                 }
-            } catch (OverpassException $e) {
+            } catch (\Throwable $e) {
+                $io->warning(sprintf(
+                    "Erreur chunk %s,%s : %s",
+                    $chunk->getLatMin(), $chunk->getLngMin(), $e->getMessage()
+                ));
                 $this->manager->markFailed($chunk);
                 $consecutiveFailures++;
 
@@ -139,13 +135,6 @@ class WorldExpansionCommand extends Command
                     $io->error("{$maxFailures} échecs consécutifs — arrêt");
                     break;
                 }
-            } catch (\Throwable $e) {
-                $io->warning(sprintf(
-                    "Erreur chunk %s,%s : %s",
-                    $chunk->getLatMin(), $chunk->getLngMin(), $e->getMessage()
-                ));
-                $this->manager->markFailed($chunk);
-                $consecutiveFailures++;
             }
         }
 

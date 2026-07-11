@@ -2,51 +2,42 @@
 
 namespace App\Service\Game\Road;
 
-use App\Repository\RoadRepository;
+use App\Repository\RoadSegmentRepository;
+use App\Repository\RoadNodeRepository;
+use App\Service\Osm\SpatialIndexer;
 use App\Service\Game\Generate\GenerateChunkService;
 
 /**
  * Service de logique métier lié aux routes.
- * Permet de vérifier des informations sur les routes, comme la proximité.
- * Orchestre la génération de routes si elles n'existent pas.
- *
- * Utilise des bounding boxes (pas de chunkId) pour rester cohérent avec la génération Overpass.
+ * Vérifie la proximité des segments (nouveau schéma).
  */
 class RoadService
 {
-    /** Marge de recherche autour du point pour capturer les routes proches des bords de cellule. */
-    private const SEARCH_RADIUS = 0.02;
+    private const SEARCH_RADIUS = 0.02; // Degrés
 
     public function __construct(
-        private RoadRepository $roadRepository,
+        private RoadSegmentRepository $roadSegmentRepository,
+        private RoadNodeRepository $nodeRepository,
+        private SpatialIndexer $spatialIndexer,
         private GenerateChunkService $chunkGenerator,
     ) {}
 
     /**
-     * Vérifie si un point GPS est à proximité d'une route.
-     * Si aucune route n'est trouvée dans la zone, déclenche la génération Overpass.
+     * Vérifie si un point GPS est à proximité d'un segment.
      */
     public function isNearRoad(float $lat, float $lng, float $maxDistance = 50): bool
     {
-        // 1. Chercher les routes dans une bbox élargie (±0.02°)
-        $roads = $this->findRoadsNear($lat, $lng);
+        $segments = $this->findSegmentsNear($lat, $lng);
 
-        // 2. Si rien trouvé, générer la zone puis re-chercher
-        if (empty($roads)) {
+        if (empty($segments)) {
             $this->chunkGenerator->generate($lat, $lng);
-            $roads = $this->findRoadsNear($lat, $lng);
+            $segments = $this->findSegmentsNear($lat, $lng);
         }
 
-        // 3. Vérifier la distance à chaque segment de route
-        foreach ($roads as $road) {
-            $points = $road->getPoints();
-            for ($i = 0; $i < count($points) - 1; $i++) {
-                $a = $points[$i];
-                $b = $points[$i + 1];
-
-                if ($this->distanceToSegment($lat, $lng, $a, $b) < $maxDistance) {
-                    return true;
-                }
+        foreach ($segments as $segment) {
+            $dist = $this->distanceToSegment($lat, $lng, $segment);
+            if ($dist < $maxDistance) {
+                return true;
             }
         }
 
@@ -54,67 +45,58 @@ class RoadService
     }
 
     /**
-     * Cherche les routes dans une bbox élargie autour du point.
-     *
-     * @return \App\Entity\Road[]
+     * Trouve les segments proches d'un point via l'index spatial.
      */
-    private function findRoadsNear(float $lat, float $lng): array
+    private function findSegmentsNear(float $lat, float $lng): array
     {
-        return $this->roadRepository->findByBbox(
-            $lat - self::SEARCH_RADIUS,
-            $lng - self::SEARCH_RADIUS,
-            $lat + self::SEARCH_RADIUS,
-            $lng + self::SEARCH_RADIUS,
+        $cellId = \App\Entity\SpatialCell::buildId($lat, $lng);
+
+        return $this->spatialIndexer->findSegmentsInCell($cellId);
+    }
+
+    /**
+     * Calcule la distance d'un point à un segment.
+     */
+    private function distanceToSegment(float $lat, float $lng, $segment): float
+    {
+        $start = $this->nodeRepository->find($segment->getNodeStartId());
+        $end = $this->nodeRepository->find($segment->getNodeEndId());
+
+        if (!$start || !$end) {
+            return PHP_FLOAT_MAX;
+        }
+
+        return $this->pointToSegmentDistance(
+            $lat, $lng,
+            $start->getLat(), $start->getLng(),
+            $end->getLat(), $end->getLng()
         );
     }
 
     /**
-     * Calcule la distance la plus courte entre un point et un segment [a, b].
-     * Utilise une approximation pour le gameplay, pas un calcul géodésique précis.
+     * Distance perpendiculaire d'un point à un segment.
      */
-    private function distanceToSegment(float $lat, float $lng, array $a, array $b): float
+    private function pointToSegmentDistance(float $px, float $py, float $x1, float $y1, float $x2, float $y2): float
     {
-        $x  = $lat;
-        $y  = $lng;
-        $x1 = $a[0];
-        $y1 = $a[1];
-        $x2 = $b[0];
-        $y2 = $b[1];
+        $dx = $x2 - $x1;
+        $dy = $y2 - $y1;
 
-        $A = $x - $x1;
-        $B = $y - $y1;
-        $C = $x2 - $x1;
-        $D = $y2 - $y1;
-
-        $dot  = $A * $C + $B * $D;
-        $lenSq = $C * $C + $D * $D;
-
-        if ($lenSq == 0) {
-            return $this->approxDistance($x, $y, $x1, $y1);
+        if ($dx == 0 && $dy == 0) {
+            return $this->approxDistance($px, $py, $x1, $y1);
         }
 
-        $param = $dot / $lenSq;
+        $t = (($px - $x1) * $dx + ($py - $y1) * $dy) / ($dx * $dx + $dy * $dy);
+        $t = max(0, min(1, $t));
 
-        if ($param < 0) {
-            return $this->approxDistance($x, $y, $x1, $y1);
-        }
+        $xx = $x1 + $t * $dx;
+        $yy = $y1 + $t * $dy;
 
-        if ($param > 1) {
-            return $this->approxDistance($x, $y, $x2, $y2);
-        }
-
-        $xx = $x1 + $param * $C;
-        $yy = $y1 + $param * $D;
-
-        return $this->approxDistance($x, $y, $xx, $yy);
+        return $this->approxDistance($px, $py, $xx, $yy);
     }
 
-    /**
-     * Distance approximative en degrés (suffisant pour le gameplay).
-     */
     private function approxDistance(float $lat1, float $lng1, float $lat2, float $lng2): float
     {
-        $dx = ($lat2 - $lat1) * 111000; // ~111 km par degré de latitude
+        $dx = ($lat2 - $lat1) * 111000;
         $dy = ($lng2 - $lng1) * 111000 * cos(deg2rad($lat1));
         return sqrt($dx * $dx + $dy * $dy);
     }

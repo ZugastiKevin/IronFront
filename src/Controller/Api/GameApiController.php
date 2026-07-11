@@ -16,7 +16,7 @@ use App\Repository\DeliveryRepository;
 use App\Repository\GameResourceDepositRepository;
 use App\Repository\ResourceDepositRepository;
 use App\Repository\ResourceTypeRepository;
-use App\Repository\RoadRepository;
+use App\Repository\RoadSegmentRepository;
 use App\Service\CoordinateService;
 use App\Service\Game\Building\BuildingService;
 use App\Service\Game\Building\EnemyBaseService;
@@ -333,18 +333,40 @@ final class GameApiController extends AbstractController
     }
 
     #[Route('/api/chunks/bulk', methods: ['POST'])]
-    public function getChunksBulk(Request $request, RoadRepository $roadRepo): JsonResponse
+    public function getChunksBulk(Request $request, RoadSegmentRepository $roadSegmentRepo, EntityManagerInterface $em): JsonResponse
     {
         $bbox = $this->parseBbox($request);
 
-        $roads = $roadRepo->findByBbox($bbox['south'], $bbox['west'], $bbox['north'], $bbox['east']);
+        // Trouver les segments via bbox
+        $segments = $roadSegmentRepo->createQueryBuilder('s')
+            ->where('s.bboxLatMax >= :south')->setParameter('south', $bbox['south'])
+            ->andWhere('s.bboxLatMin <= :north')->setParameter('north', $bbox['north'])
+            ->andWhere('s.bboxLngMax >= :west')->setParameter('west', $bbox['west'])
+            ->andWhere('s.bboxLngMin <= :east')->setParameter('east', $bbox['east'])
+            ->getQuery()
+            ->getResult();
+
+        $roads = [];
+        $nodeRepo = $em->getRepository(\App\Entity\RoadNode::class);
+
+        foreach ($segments as $segment) {
+            $start = $nodeRepo->find($segment->getNodeStartId());
+            $end = $nodeRepo->find($segment->getNodeEndId());
+
+            if ($start && $end) {
+                $roads[] = [
+                    'id' => $segment->getId(),
+                    'points' => [
+                        [$start->getLat(), $start->getLng()],
+                        [$end->getLat(), $end->getLng()],
+                    ],
+                    'type' => $segment->getType(),
+                ];
+            }
+        }
 
         return $this->json([
-            'roads' => array_map(fn($r) => [
-                'id'     => $r->getId(),
-                'points' => $r->getPoints(),
-                'type'   => $r->getType(),
-            ], $roads),
+            'roads' => $roads,
         ]);
     }
 
@@ -370,11 +392,7 @@ final class GameApiController extends AbstractController
             return $this->json([
                 'status' => 'ok',
                 'roads_created' => $result['roads_created'],
-                'roads' => array_map(fn($r) => [
-                    'id' => $r->getId(),
-                    'points' => $r->getPoints(),
-                    'type' => $r->getType(),
-                ], $result['roads']),
+                'roads' => [], // Les segments sont déjà en base
             ]);
         } catch (\Throwable $e) {
             return $this->json([
@@ -842,8 +860,8 @@ final class GameApiController extends AbstractController
             $lat = $deposit->getLatitude();
             $lng = $deposit->getLongitude();
 
-            // Récupérer le chunk depuis la route du dépôt
-            $chunk = $road->getChunk();
+            // Récupérer le chunk depuis les coordonnées du dépôt
+            $chunk = $chunkRepo->findOrCreateByBbox($this->coordinateService->getBoundingBox($lat, $lng));
             if (!$chunk) {
                 return $this->json(['error' => 'Deposit chunk not found'], 400);
             }

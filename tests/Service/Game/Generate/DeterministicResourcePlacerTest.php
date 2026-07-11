@@ -5,32 +5,42 @@ namespace App\Tests\Service\Game\Generate;
 use App\Entity\Chunk;
 use App\Entity\ResourceDeposit;
 use App\Entity\ResourceType;
-use App\Entity\Road;
+use App\Entity\RoadNode;
+use App\Entity\RoadSegment;
 use App\Enum\ResourceCode;
+use App\Repository\RoadNodeRepository;
 use App\Service\Game\Generate\DeterministicResourcePlacer;
+use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Vérifie le contrat de DeterministicResourcePlacer :
+ * Vérifie le contrat de DeterministicResourcePlacer (utilise RoadSegment) :
  *
  *  - déterminisme (même chunk = mêmes positions/types/richesses, même seed)
  *  - stricte borne 0..2 dépôts par chunk
  *  - 1 dépôt quand UNE seule route, 2 dépôts si ≥ 2 routes
  *  - types DISTINCTS quand 2 routes
- *  - Road associée à chaque dépôt
- *  - les dépôts ne sont DANS le chunk bbox
+ *  - RoadSegment associé à chaque dépôt
+ *  - les dépôts sont DANS le chunk bbox
  *  - aucun appel à rand()/mt_rand()/random_int() n'est fait (pas de seed global)
  */
 final class DeterministicResourcePlacerTest extends TestCase
 {
     private DeterministicResourcePlacer $placer;
+    private RoadNodeRepository&MockObject $nodeRepository;
+    private EntityManagerInterface&MockObject $em;
 
     /** @var ResourceType[] */
     private array $types;
 
     protected function setUp(): void
     {
-        $this->placer = new DeterministicResourcePlacer();
+        $this->nodeRepository = $this->createMock(RoadNodeRepository::class);
+        $this->em = $this->createMock(EntityManagerInterface::class);
+        $this->em->method('getRepository')->with(\App\Entity\RoadNode::class)->willReturn($this->nodeRepository);
+
+        $this->placer = new DeterministicResourcePlacer($this->em);
 
         // 3 types : couleur + rarity distincts.
         $this->types = [
@@ -55,16 +65,33 @@ final class DeterministicResourcePlacerTest extends TestCase
     }
 
     /**
-     * Route linéaire horizontale dans la bbox.
+     * Segment linéaire horizontale dans la bbox.
      *
-     * @param array<int, array{float, float}> $points
+     * @param array<int, array{0: float, 1: float}> $points
      */
-    private function makeRoad(string $type, array $points): Road
+    private function makeSegment(string $type, array $points, int $startId, int $endId): RoadSegment
     {
-        $road = new Road();
-        $road->setType($type);
-        $road->setPoints($points);
-        return $road;
+        $segment = new RoadSegment();
+        $segment->setType($type);
+        $segment->setPolyline($points);
+        $segment->setNodeStartId($startId);
+        $segment->setNodeEndId($endId);
+        return $segment;
+    }
+
+    /**
+     * Stub les nœuds utilisés par leurs identifiants (le placeur calcule le
+     * milieu du segment à partir des coordonnées des nœuds start/end).
+     *
+     * @param array<int, array{0: float, 1: float}> $coords  map id => [lat, lng]
+     */
+    private function stubNodes(array $coords): void
+    {
+        $map = [];
+        foreach ($coords as $id => [$lat, $lng]) {
+            $map[] = [$id, new RoadNode($lat, $lng)];
+        }
+        $this->nodeRepository->method('find')->willReturnMap($map);
     }
 
     private function makeType(int $id, ResourceCode $code, string $color, int $rarity): ResourceType
@@ -85,47 +112,64 @@ final class DeterministicResourcePlacerTest extends TestCase
     // Tests
     // -----------------------------------------------------------------------
 
-    /**
-     * Le seed est dérivé du chunk, donc deux chunks différents doivent
-     * produire (en général) des placements différents.
-     */
     public function testDifferentChunksProduceDifferentPositions(): void
     {
-        $chunk1 = $this->makeChunk(48.85, 2.35);
-        $chunk2 = $this->makeChunk(43.60, 1.44);
-
         $roads = [
-            $this->makeRoad('primary', [[48.855, 2.355], [48.859, 2.360]]),
-            $this->makeRoad('secondary', [[48.856, 2.358], [48.860, 2.365]]),
+            $this->makeSegment('primary', [[48.855, 2.355], [48.859, 2.360]], 1, 2),
+            $this->makeSegment('secondary', [[48.856, 2.358], [48.860, 2.365]], 3, 4),
+        ];
+        $this->stubNodes([
+            1 => [48.855, 2.355], 2 => [48.859, 2.360],
+            3 => [48.856, 2.358], 4 => [48.860, 2.365],
+        ]);
+
+        // Plusieurs chunks distincts : au moins deux doivent produire des
+        // placements différents (la seed dérive du chunk). On compare un
+        // ensemble de chunks plutôt qu'une paire pour éviter un test aléatoire.
+        $chunks = [
+            $this->makeChunk(48.85, 2.35),
+            $this->makeChunk(43.60, 1.44),
+            $this->makeChunk(10.0, 20.0),
+            $this->makeChunk(35.0, 139.0),
+            $this->makeChunk(-33.0, 151.0),
         ];
 
-        $deposits1 = $this->placer->placeResources($chunk1, $roads, $this->types);
-        $deposits2 = $this->placer->placeResources($chunk2, $roads, $this->types);
+        $signatures = [];
+        foreach ($chunks as $chunk) {
+            $deposits = $this->placer->placeResources($chunk, $roads, $this->types);
+            self::assertCount(2, $deposits);
 
-        self::assertCount(2, $deposits1);
-        self::assertCount(2, $deposits2);
+            $sig = array_map(
+                fn(ResourceDeposit $d): string => sprintf(
+                    '%.6F|%.6F|%d|%.1F',
+                    $d->getLatitude(),
+                    $d->getLongitude(),
+                    $d->getResourceType()->getId(),
+                    $d->getRichness()
+                ),
+                $deposits
+            );
+            $signatures[] = implode('#', $sig);
+        }
 
-        // Au moins un attribut diffère entre les chunks (sauf exception statistique infime).
-        self::assertFalse(
-            $deposits1[0]->getLatitude() === $deposits2[0]->getLatitude()
-            && $deposits1[0]->getLongitude() === $deposits2[0]->getLongitude()
-            && $deposits1[0]->getResourceType()->getId() === $deposits2[0]->getResourceType()->getId()
-            && $deposits1[1]->getLatitude() === $deposits2[1]->getLatitude()
-            && $deposits1[1]->getLongitude() === $deposits2[1]->getLongitude(),
-            'Deux chunks différents devraient produire des placements différents.',
+        self::assertGreaterThan(
+            1,
+            count(array_unique($signatures)),
+            'Des chunks différents devraient produire des placements différents.',
         );
     }
 
-    /**
-     * Même appelant, même chunk, même routes → MÊMES dépôts (déterministe strict).
-     */
     public function testSameParametersAreDeterministic(): void
     {
         $chunk = $this->makeChunk(48.85, 2.35);
         $roads = [
-            $this->makeRoad('primary', [[48.855, 2.351], [48.858, 2.358]]),
-            $this->makeRoad('secondary', [[48.85, 2.355], [48.856, 2.365]]),
+            $this->makeSegment('primary', [[48.855, 2.351], [48.858, 2.358]], 1, 2),
+            $this->makeSegment('secondary', [[48.85, 2.355], [48.856, 2.365]], 3, 4),
         ];
+        $this->stubNodes([
+            1 => [48.855, 2.351], 2 => [48.858, 2.358],
+            3 => [48.85, 2.355], 4 => [48.856, 2.365],
+        ]);
 
         $a = $this->placer->placeResources($chunk, $roads, $this->types);
         $b = $this->placer->placeResources($chunk, $roads, $this->types);
@@ -142,15 +186,13 @@ final class DeterministicResourcePlacerTest extends TestCase
         }
     }
 
-    /**
-     * Un seul dépôt si une seule route dans le chunk.
-     */
     public function testSingleRoadYieldsSingleDeposit(): void
     {
         $chunk = $this->makeChunk(48.85, 2.35);
         $roads = [
-            $this->makeRoad('primary', [[48.852, 2.351], [48.858, 2.355]]),
+            $this->makeSegment('primary', [[48.852, 2.351], [48.858, 2.355]], 1, 2),
         ];
+        $this->stubNodes([1 => [48.852, 2.351], 2 => [48.858, 2.355]]);
 
         $deposits = $this->placer->placeResources($chunk, $roads, $this->types);
 
@@ -158,34 +200,38 @@ final class DeterministicResourcePlacerTest extends TestCase
         self::assertNotNull($deposits[0]->getRoad());
     }
 
-    /**
-     * Strictement ≤ 2 dépôts, peu importe le nombre de routes.
-     */
     public function testAtMostDepositsPerChunk(): void
     {
         $chunk = $this->makeChunk(48.85, 2.35);
         $roads = [
-            $this->makeRoad('primary', [[48.851, 2.351], [48.852, 2.352]]),
-            $this->makeRoad('secondary', [[48.855, 2.355], [48.856, 2.356]]),
-            $this->makeRoad('residential', [[48.859, 2.359], [48.86, 2.36]]),
-            $this->makeRoad('tertiary', [[48.85, 2.35], [48.851, 2.351]]),
+            $this->makeSegment('primary', [[48.851, 2.351], [48.852, 2.352]], 1, 2),
+            $this->makeSegment('secondary', [[48.855, 2.355], [48.856, 2.356]], 3, 4),
+            $this->makeSegment('residential', [[48.859, 2.359], [48.86, 2.36]], 5, 6),
+            $this->makeSegment('tertiary', [[48.85, 2.35], [48.851, 2.351]], 7, 8),
         ];
+        $this->stubNodes([
+            1 => [48.851, 2.351], 2 => [48.852, 2.352],
+            3 => [48.855, 2.355], 4 => [48.856, 2.356],
+            5 => [48.859, 2.359], 6 => [48.86, 2.36],
+            7 => [48.85, 2.35], 8 => [48.851, 2.351],
+        ]);
 
         $deposits = $this->placer->placeResources($chunk, $roads, $this->types);
 
         self::assertCount(2, $deposits);
     }
 
-    /**
-     * Deux routes → les deux dépôts ont des types DISTINCTS.
-     */
     public function testTwoRoadsYieldsDistinctResourceTypes(): void
     {
         $chunk = $this->makeChunk(48.85, 2.35);
         $roads = [
-            $this->makeRoad('primary', [[48.851, 2.351], [48.854, 2.354]]),
-            $this->makeRoad('secondary', [[48.855, 2.355], [48.858, 2.358]]),
+            $this->makeSegment('primary', [[48.851, 2.351], [48.854, 2.354]], 1, 2),
+            $this->makeSegment('secondary', [[48.855, 2.355], [48.858, 2.358]], 3, 4),
         ];
+        $this->stubNodes([
+            1 => [48.851, 2.351], 2 => [48.854, 2.354],
+            3 => [48.855, 2.355], 4 => [48.858, 2.358],
+        ]);
 
         $deposits = $this->placer->placeResources($chunk, $roads, $this->types);
 
@@ -197,18 +243,18 @@ final class DeterministicResourcePlacerTest extends TestCase
         );
     }
 
-    /**
-     * Si UNE SEULE route ET un seul type → on n'a qu'un dépôt (cohérent : on
-     * ne peut pas dédoubler le même type sans 2 routes).
-     */
     public function testHandlesOnlyOneResourceTypeGracefully(): void
     {
         $singleType = [$this->makeType(1, ResourceCode::IRON, '#000000', 0)];
         $chunk = $this->makeChunk(48.85, 2.35);
         $roads = [
-            $this->makeRoad('primary', [[48.851, 2.351], [48.855, 2.355]]),
-            $this->makeRoad('secondary', [[48.856, 2.356], [48.859, 2.359]]),
+            $this->makeSegment('primary', [[48.851, 2.351], [48.855, 2.355]], 1, 2),
+            $this->makeSegment('secondary', [[48.856, 2.356], [48.859, 2.359]], 3, 4),
         ];
+        $this->stubNodes([
+            1 => [48.851, 2.351], 2 => [48.855, 2.355],
+            3 => [48.856, 2.356], 4 => [48.859, 2.359],
+        ]);
 
         $deposits = $this->placer->placeResources($chunk, $roads, $singleType);
 
@@ -217,28 +263,21 @@ final class DeterministicResourcePlacerTest extends TestCase
         self::assertSame($singleType[0]->getId(), $deposits[1]->getResourceType()->getId());
     }
 
-    /**
-     * Cas vide : aucune route -> 0 dépôts.
-     */
     public function testEmptyRoadsYieldsNoDeposits(): void
     {
         $deposits = $this->placer->placeResources($this->makeChunk(0.0, 0.0), [], $this->types);
         self::assertSame([], $deposits);
     }
 
-    /**
-     * Cas vide : aucune route type -> 0 dépôts.
-     */
     public function testEmptyResourceTypesYieldsNoDeposits(): void
     {
-        $roads = [$this->makeRoad('primary', [[0.0, 0.0], [0.001, 0.001]])];
+        $roads = [$this->makeSegment('primary', [[0.0, 0.0], [0.001, 0.001]], 1, 2)];
+        $this->stubNodes([1 => [0.0, 0.0], 2 => [0.001, 0.001]]);
+
         $deposits = $this->placer->placeResources($this->makeChunk(0.0, 0.0), $roads, []);
         self::assertSame([], $deposits);
     }
 
-    /**
-     * ResourceType sans couleur doit être écarté.
-     */
     public function testTypesWithoutColorAreSkipped(): void
     {
         $noColorType = new ResourceType();
@@ -249,25 +288,26 @@ final class DeterministicResourcePlacerTest extends TestCase
         $noColorType->setRarity(0);
 
         $chunk = $this->makeChunk(0.0, 0.0);
-        $roads = [$this->makeRoad('primary', [[0.0, 0.0], [0.001, 0.001]])];
+        $roads = [$this->makeSegment('primary', [[0.0, 0.0], [0.001, 0.001]], 1, 2)];
+        $this->stubNodes([1 => [0.0, 0.0], 2 => [0.001, 0.001]]);
 
         // Si AUCUN type valide, le placere retourne [].
         $deposits = $this->placer->placeResources($chunk, $roads, [$noColorType]);
         self::assertSame([], $deposits);
     }
 
-    /**
-     * Vérifie l'invariance suivante : sur un appel, le rang 0 (proche route)
-     * a un richness dans l'ensemble autorisé {0.6, 0.8, 1.0, 1.2, 1.4}.
-     */
     public function testRichnessIsInExpectedBuckets(): void
     {
         $allowed = [0.6, 0.8, 1.0, 1.2, 1.4];
         $chunk = $this->makeChunk(10.0, 20.0);
         $roads = [
-            $this->makeRoad('primary', [[10.001, 20.001], [10.004, 20.004]]),
-            $this->makeRoad('secondary', [[10.005, 20.005], [10.009, 20.009]]),
+            $this->makeSegment('primary', [[10.001, 20.001], [10.004, 20.004]], 1, 2),
+            $this->makeSegment('secondary', [[10.005, 20.005], [10.009, 20.009]], 3, 4),
         ];
+        $this->stubNodes([
+            1 => [10.001, 20.001], 2 => [10.004, 20.004],
+            3 => [10.005, 20.005], 4 => [10.009, 20.009],
+        ]);
 
         $deposits = $this->placer->placeResources($chunk, $roads, $this->types);
         foreach ($deposits as $deposit) {
@@ -275,10 +315,6 @@ final class DeterministicResourcePlacerTest extends TestCase
         }
     }
 
-    /**
-     * Appels concurrents entre chunks ne doivent pas s'influencer (pas d'état
-     * partagé entre deux appels, sauf static inline).
-     */
     public function testMultipleParchelledInvocationsAreIndependent(): void
     {
         $chunks = [
@@ -287,10 +323,25 @@ final class DeterministicResourcePlacerTest extends TestCase
             $this->makeChunk(30.0, 30.0),
         ];
         $roadsByChunk = [
-            [$this->makeRoad('primary', [[10.001, 10.001], [10.009, 10.009]]), $this->makeRoad('secondary', [[10.005, 10.0], [10.009, 1.0]])],
-            [$this->makeRoad('primary', [[20.001, 20.001], [20.009, 20.009]])],
-            [$this->makeRoad('tertiary', [[30.001, 30.001], [30.009, 30.009]]), $this->makeRoad('residential', [[30.005, 30.005], [30.009, 30.009]])],
+            [
+                $this->makeSegment('primary', [[10.001, 10.001], [10.009, 10.009]], 1, 2),
+                $this->makeSegment('secondary', [[10.005, 10.0], [10.009, 1.0]], 3, 4),
+            ],
+            [
+                $this->makeSegment('primary', [[20.001, 20.001], [20.009, 20.009]], 5, 6),
+            ],
+            [
+                $this->makeSegment('tertiary', [[30.001, 30.001], [30.009, 30.009]], 7, 8),
+                $this->makeSegment('residential', [[30.005, 30.005], [30.009, 30.009]], 9, 10),
+            ],
         ];
+        $this->stubNodes([
+            1 => [10.001, 10.001], 2 => [10.009, 10.009],
+            3 => [10.005, 10.0], 4 => [10.009, 1.0],
+            5 => [20.001, 20.001], 6 => [20.009, 20.009],
+            7 => [30.001, 30.001], 8 => [30.009, 30.009],
+            9 => [30.005, 30.005], 10 => [30.009, 30.009],
+        ]);
 
         // 1) premier passage
         $first = [];

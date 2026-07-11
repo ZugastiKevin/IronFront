@@ -4,11 +4,11 @@ namespace App\Service\Game\Generate;
 
 use App\Entity\Chunk;
 use App\Entity\ResourceDeposit;
-use App\Entity\Road;
+use App\Entity\RoadSegment;
 use App\Repository\ChunkRepository;
 use App\Repository\ResourceDepositRepository;
 use App\Repository\ResourceTypeRepository;
-use App\Repository\RoadRepository;
+use App\Repository\RoadSegmentRepository;
 use App\Service\CoordinateService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -16,7 +16,7 @@ use Psr\Log\LoggerInterface;
 /**
  * Service responsable de la génération du contenu d'une zone.
  *
- * Les routes sont lues depuis la table `road` (déjà importée via OsmImportCommand).
+ * Les routes sont lues depuis la table `road_segment` via l'index spatial.
  * Les dépôts de ressources sont placés déterministement.
  */
 class GenerateChunkService
@@ -24,12 +24,12 @@ class GenerateChunkService
     public function __construct(
         private ResourceTypeRepository $resourceTypeRepository,
         private ChunkRepository $chunkRepository,
-        private RoadRepository $roadRepository,
+        private RoadSegmentRepository $roadSegmentRepository,
         private ResourceDepositRepository $resourceDepositRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
         private CoordinateService $coordinateService,
-        private GeofabrikRoadProvider $roadProvider,
+        private RoadIndexProvider $roadProvider,
         private DeterministicResourcePlacer $resourcePlacer,
     ) {}
 
@@ -53,7 +53,7 @@ class GenerateChunkService
         ));
 
         // Chercher les routes existantes
-        $existingRoads = $this->roadRepository->findByBbox(
+        $existingRoads = $this->roadSegmentRepository->findByBbox(
             $bbox['latMin'] - 0.001,
             $bbox['lngMin'] - 0.001,
             $bbox['latMax'] + 0.001,
@@ -128,7 +128,7 @@ class GenerateChunkService
         $chunk = $this->chunkRepository->findOrCreateByBbox($bbox);
 
         // Chercher les routes existantes
-        $existingRoads = $this->roadRepository->findByBbox(
+        $existingRoads = $this->roadSegmentRepository->findByBbox(
             $bbox['latMin'] - 0.001,
             $bbox['lngMin'] - 0.001,
             $bbox['latMax'] + 0.001,

@@ -5,7 +5,7 @@ namespace App\Command;
 use App\Entity\Chunk;
 use App\Repository\ResourceTypeRepository;
 use App\Service\Game\Generate\DeterministicResourcePlacer;
-use App\Service\Game\Generate\GeofabrikRoadProvider;
+use App\Service\Game\Generate\RoadIndexProvider;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -38,7 +38,7 @@ class GenerateDepositsCommand extends Command
     public function __construct(
         private readonly ResourceTypeRepository $resourceTypeRepository,
         private readonly EntityManagerInterface $em,
-        private readonly GeofabrikRoadProvider $roadProvider,
+        private readonly RoadIndexProvider $roadProvider,
         private readonly DeterministicResourcePlacer $resourcePlacer,
         private readonly LoggerInterface $logger,
     ) {
@@ -146,14 +146,11 @@ class GenerateDepositsCommand extends Command
                 if ($existingDeposits < 2) {
                     $allTypes = $this->resourceTypeRepository->findAll();
 
-                    // Les routes sont déjà en base, mais doivent être mergées pour être liées aux deposits
-                    $managedRoads = [];
-                    foreach ($roads as $road) {
-                        $managedRoads[] = $this->em->merge($road);
-                    }
-
+                    // Les segments proviennent de RoadIndexProvider (road_segment, déjà
+                    // persistés en base et gérés par le même EntityManager) : aucun merge
+                    // nécessaire, on les passe tels quels au placement des dépôts.
                     if (!$dryRun) {
-                        $deposits = $this->resourcePlacer->placeResources($chunk, $managedRoads, $allTypes);
+                        $deposits = $this->resourcePlacer->placeResources($chunk, $roads, $allTypes);
                         foreach ($deposits as $deposit) {
                             $this->em->persist($deposit);
                             $totalDeposits++;

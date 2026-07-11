@@ -3,9 +3,9 @@
 namespace App\Command;
 
 use App\Entity\Chunk;
-use App\Repository\RoadRepository;
-use App\Service\CoordinateService;
-use App\Service\Game\Generate\DeterministicResourcePlacer;
+use App\Repository\RoadSegmentRepository;
+use App\Repository\SpatialCellRepository;
+use App\Service\Osm\SpatialIndexer;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -16,21 +16,25 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
- * Import complet : roads → chunks → resource_deposits.
+ * Import complet : segments → chunks.
  *
  * Usage :
  *   php bin/console osm:full-import
- *   php bin/console osm:full-import --area=europe
+ *   php bin/console osm:full-import --bbox="48.0,2.0,49.0,3.0"
  */
 #[AsCommand(
     name: 'osm:full-import',
-    description: 'Import complet : roads → chunks → resource_deposits (un seul chunk = un seul appel)',
+    description: 'Import complet : segments → chunks (un seul appel)',
 )]
 class FullImportCommand extends Command
 {
+    private const CHUNK_SIZE = 0.01; // ~1km
+
     public function __construct(
-        private readonly RoadRepository $roadRepository,
+        private readonly RoadSegmentRepository $roadSegmentRepository,
+        private readonly SpatialIndexer $spatialIndexer,
         private readonly EntityManagerInterface $em,
+        private readonly LoggerInterface $logger,
     ) {
         parent::__construct();
     }
@@ -38,7 +42,7 @@ class FullImportCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addOption('bbox', null, InputOption::VALUE_REQUIRED, 'BBox "south,west,north,east" ou "europe"')
+            ->addOption('bbox', null, InputOption::VALUE_REQUIRED, 'BBox "south,west,north,east"')
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Ne rien écrire en base');
     }
 
@@ -48,11 +52,11 @@ class FullImportCommand extends Command
         $bboxOption = $input->getOption('bbox');
         $dryRun = (bool) $input->getOption('dry-run');
 
-        $io->title('Import complet ironfront');
+        $io->title('Import complet ironfront - chunks depuis index spatial');
 
-        // Définir la bbox
-        if ($bboxOption === null || $bboxOption === 'europe') {
-            $bbox = ['south' => 35.0, 'west' => -10.0, 'north' => 84.0, 'east' => 45.0];
+        // BBox par défaut (Europe)
+        if ($bboxOption === null) {
+            $bbox = ['south' => 35.0, 'west' => -10.0, 'north' => 72.0, 'east' => 45.0];
         } else {
             $parts = explode(',', $bboxOption);
             if (count($parts) !== 4) {
@@ -72,41 +76,32 @@ class FullImportCommand extends Command
             $bbox['south'], $bbox['west'], $bbox['north'], $bbox['east']
         ));
 
-        // 1. Créer les chunks pour cette bbox
         $chunksCreated = 0;
-        $depositsCreated = 0;
 
-        $size = 0.01; // CHUNK_SIZE
+        for ($lat = floor($bbox['south'] / self::CHUNK_SIZE) * self::CHUNK_SIZE; $lat < $bbox['north']; $lat += self::CHUNK_SIZE) {
+            for ($lng = floor($bbox['west'] / self::CHUNK_SIZE) * self::CHUNK_SIZE; $lng < $bbox['east']; $lng += self::CHUNK_SIZE) {
 
-        for ($lat = floor($bbox['south'] / $size) * $size; $lat < $bbox['north']; $lat += $size) {
-            for ($lng = floor($bbox['west'] / $size) * $size; $lng < $bbox['east']; $lng += $size) {
+                // Trouver les segments via l'index spatial
+                $cellId = sprintf('%d_%d', floor($lat / \App\Entity\SpatialCell::CELL_SIZE_DEGREES), floor($lng / \App\Entity\SpatialCell::CELL_SIZE_DEGREES));
 
-                // Chercher les routes dans ce chunk
-                $roads = $this->roadRepository->findByBbox(
-                    $lat,
-                    $lng,
-                    $lat + $size,
-                    $lng + $size
-                );
-
-                if (empty($roads)) {
-                    continue;
-                }
-
-                // Créer le chunk
+                // Pour l'instant on crée les chunks même s'ils sont vides
+                // (ils seront marqués 'empty' après vérification)
                 if (!$dryRun) {
                     $chunk = new Chunk();
                     $chunk->setLatMin($lat);
                     $chunk->setLngMin($lng);
-                    $chunk->setLatMax($lat + $size);
-                    $chunk->setLngMax($lng + $size);
-                    $chunk->setChunkId(sprintf('%d_%d', floor($lat/$size), floor($lng/$size)));
+                    $chunk->setLatMax($lat + self::CHUNK_SIZE);
+                    $chunk->setLngMax($lng + self::CHUNK_SIZE);
+                    $chunk->setChunkId(sprintf('%d_%d', (int) floor($lat / self::CHUNK_SIZE), (int) floor($lng / self::CHUNK_SIZE)));
 
                     $this->em->persist($chunk);
                 }
 
                 $chunksCreated++;
-                $io->text(sprintf("Chunk %.2f,%.2f : %d routes", $lat, $lng, count($roads)));
+
+                if ($lat * $lng % 10 === 0) {
+                    $io->text(sprintf("Chunk %.2f,%.2f créé", $lat, $lng));
+                }
             }
         }
 
@@ -114,9 +109,7 @@ class FullImportCommand extends Command
             $this->em->flush();
         }
 
-        $io->success([
-            "{$chunksCreated} chunks créés",
-        ]);
+        $io->success(["{$chunksCreated} chunks créés"]);
 
         return Command::SUCCESS;
     }
