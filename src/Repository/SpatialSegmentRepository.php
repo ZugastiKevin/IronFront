@@ -4,6 +4,7 @@ namespace App\Repository;
 
 use App\Entity\SpatialSegment;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -40,13 +41,35 @@ class SpatialSegmentRepository extends ServiceEntityRepository
         $maxY = (int) floor($east / $cellSize);
 
         // Utiliser une requête SQL directe pour performance
-        $conn = $this->_em->getConnection();
+        $conn = $this->getEntityManager()->getConnection();
         $rows = $conn->fetchAllAssociative(
             "SELECT id FROM spatial_cell WHERE x BETWEEN :minX AND :maxX AND y BETWEEN :minY AND :maxY",
             ['minX' => $minX, 'maxX' => $maxX, 'minY' => $minY, 'maxY' => $maxY]
         );
 
         return array_map(fn($row) => $row['id'], $rows);
+    }
+
+    /**
+     * Retourne les segment_id distincts associés à un ensemble de cellules.
+     * Interroge l'index idx_spatial_segment_cell (cell_id IN).
+     *
+     * @param string[] $cellIds
+     * @return int[]
+     */
+    public function findSegmentIdsByCellIds(array $cellIds): array
+    {
+        if (empty($cellIds)) {
+            return [];
+        }
+
+        $rows = $this->getEntityManager()->getConnection()->fetchAllAssociative(
+            'SELECT DISTINCT segment_id FROM spatial_segment WHERE cell_id IN (?)',
+            [$cellIds],
+            [ArrayParameterType::STRING]
+        );
+
+        return array_map(fn($row) => (int) $row['segment_id'], $rows);
     }
 
     /**

@@ -45,6 +45,6 @@ class RoadSegmentRepository extends ServiceEntityRepository
      */
     public function truncate(): void
     {
-        $this->_em->getConnection()->executeStatement('TRUNCATE TABLE road_segment');
+        $this->getEntityManager()->getConnection()->executeStatement('TRUNCATE TABLE road_segment');
     }
 }

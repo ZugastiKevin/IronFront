@@ -42,7 +42,7 @@ class RoadGraphRepository extends ServiceEntityRepository
      */
     public function truncate(): void
     {
-        $this->_em->getConnection()->executeStatement('TRUNCATE TABLE road_graph');
+        $this->getEntityManager()->getConnection()->executeStatement('TRUNCATE TABLE road_graph');
     }
 
     /**

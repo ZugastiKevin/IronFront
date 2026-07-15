@@ -16,8 +16,10 @@ use App\Repository\DeliveryRepository;
 use App\Repository\GameResourceDepositRepository;
 use App\Repository\ResourceDepositRepository;
 use App\Repository\ResourceTypeRepository;
-use App\Repository\RoadSegmentRepository;
+use App\Repository\SpatialCellRepository;
+use App\Repository\SpatialSegmentRepository;
 use App\Service\CoordinateService;
+use Doctrine\DBAL\ArrayParameterType;
 use App\Service\Game\Building\BuildingService;
 use App\Service\Game\Building\EnemyBaseService;
 use App\Service\Game\CurrentPlayer;
@@ -333,36 +335,52 @@ final class GameApiController extends AbstractController
     }
 
     #[Route('/api/chunks/bulk', methods: ['POST'])]
-    public function getChunksBulk(Request $request, RoadSegmentRepository $roadSegmentRepo, EntityManagerInterface $em): JsonResponse
-    {
+    public function getChunksBulk(
+        Request $request,
+        SpatialCellRepository $spatialCellRepo,
+        SpatialSegmentRepository $spatialSegmentRepo,
+        EntityManagerInterface $em,
+    ): JsonResponse {
         $bbox = $this->parseBbox($request);
 
-        // Trouver les segments via bbox
-        $segments = $roadSegmentRepo->createQueryBuilder('s')
-            ->where('s.bboxLatMax >= :south')->setParameter('south', $bbox['south'])
-            ->andWhere('s.bboxLatMin <= :north')->setParameter('north', $bbox['north'])
-            ->andWhere('s.bboxLngMax >= :west')->setParameter('west', $bbox['west'])
-            ->andWhere('s.bboxLngMin <= :east')->setParameter('east', $bbox['east'])
-            ->getQuery()
-            ->getResult();
+        // 1. Cellules spatiales recouvrant la bbox (index idx_spatial_cell_coords)
+        $cellIds = $spatialCellRepo->findCellIdsForBbox(
+            $bbox['south'], $bbox['west'], $bbox['north'], $bbox['east']
+        );
+
+        if ($cellIds === []) {
+            return $this->json(['roads' => []]);
+        }
+
+        // 2. segment_id distincts touchant ces cellules (index idx_spatial_segment_cell)
+        $segmentIds = $spatialSegmentRepo->findSegmentIdsByCellIds($cellIds);
+
+        if ($segmentIds === []) {
+            return $this->json(['roads' => []]);
+        }
+
+        // 3. Fetch léger (id + polyline + type) par PK — PAS d'hydratation ORM,
+        //    PAS de RoadNode::find() (N+1 sur 39 M de nœuds).
+        $conn = $em->getConnection();
+        $rows = $conn->executeQuery(
+            'SELECT id, polyline, type FROM road_segment WHERE id IN (?)',
+            [$segmentIds],
+            [ArrayParameterType::INTEGER]
+        )->fetchAllAssociative();
 
         $roads = [];
-        $nodeRepo = $em->getRepository(\App\Entity\RoadNode::class);
-
-        foreach ($segments as $segment) {
-            $start = $nodeRepo->find($segment->getNodeStartId());
-            $end = $nodeRepo->find($segment->getNodeEndId());
-
-            if ($start && $end) {
-                $roads[] = [
-                    'id' => $segment->getId(),
-                    'points' => [
-                        [$start->getLat(), $start->getLng()],
-                        [$end->getLat(), $end->getLng()],
-                    ],
-                    'type' => $segment->getType(),
-                ];
+        foreach ($rows as $row) {
+            // polyline est une chaîne JSON [[lat,lng], ...] préservant la courbure réelle
+            $points = json_decode((string) $row['polyline'], true);
+            if (!is_array($points) || count($points) < 2) {
+                continue;
             }
+
+            $roads[] = [
+                'id'     => (int) $row['id'],
+                'points' => $points,
+                'type'   => $row['type'],
+            ];
         }
 
         return $this->json([

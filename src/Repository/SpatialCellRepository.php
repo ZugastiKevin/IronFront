@@ -47,9 +47,33 @@ class SpatialCellRepository extends ServiceEntityRepository
         $cell->setLngMin($y * SpatialCell::CELL_SIZE_DEGREES);
         $cell->setLngMax(($y + 1) * SpatialCell::CELL_SIZE_DEGREES);
 
-        $this->_em->persist($cell);
+        $this->getEntityManager()->persist($cell);
 
         return $cell;
+    }
+
+    /**
+     * Retourne les cellules dont la grille recouvre la bbox donnée.
+     * Calcule la plage x/y (floor(lat/CELL_SIZE)) et interroge l'index
+     * idx_spatial_cell_coords. Renvoie les cell_id existants (une cellule
+     * n'est créée que si elle contient au moins un segment).
+     *
+     * @return string[]
+     */
+    public function findCellIdsForBbox(float $south, float $west, float $north, float $east): array
+    {
+        $size  = SpatialCell::CELL_SIZE_DEGREES;
+        $minX  = (int) floor($south / $size);
+        $maxX  = (int) floor($north / $size);
+        $minY  = (int) floor($west  / $size);
+        $maxY  = (int) floor($east  / $size);
+
+        $rows = $this->getEntityManager()->getConnection()->fetchAllAssociative(
+            'SELECT id FROM spatial_cell WHERE x BETWEEN :minX AND :maxX AND y BETWEEN :minY AND :maxY',
+            ['minX' => $minX, 'maxX' => $maxX, 'minY' => $minY, 'maxY' => $maxY]
+        );
+
+        return array_map(fn($row) => $row['id'], $rows);
     }
 
     /**
@@ -68,7 +92,7 @@ class SpatialCellRepository extends ServiceEntityRepository
      */
     public function truncate(): void
     {
-        $this->_em->getConnection()->executeStatement('TRUNCATE TABLE spatial_cell');
+        $this->getEntityManager()->getConnection()->executeStatement('TRUNCATE TABLE spatial_cell');
     }
 
     /**
@@ -76,6 +100,6 @@ class SpatialCellRepository extends ServiceEntityRepository
      */
     public function truncateSpatialSegment(): void
     {
-        $this->_em->getConnection()->executeStatement('TRUNCATE TABLE spatial_segment');
+        $this->getEntityManager()->getConnection()->executeStatement('TRUNCATE TABLE spatial_segment');
     }
 }

@@ -43,7 +43,7 @@ class RoadNodeRepository extends ServiceEntityRepository
         }
 
         $node = new RoadNode($lat, $lng);
-        $this->_em->persist($node);
+        $this->getEntityManager()->persist($node);
 
         return $node;
     }
@@ -62,6 +62,52 @@ class RoadNodeRepository extends ServiceEntityRepository
     }
 
     /**
+     * Clé de déduplication robuste : conversion single-precision (FLOAT) identique
+     * à ce que MySQL stocke, pour que l'entrée et la valeur lue correspondent
+     * exactement (et non pas via une approximation décimale fragile).
+     */
+    public static function coordKey(float $lat, float $lng): string
+    {
+        return unpack('f', pack('f', $lat))[1] . '|' . unpack('f', pack('f', $lng))[1];
+    }
+
+    /**
+     * Résout les IDs de nœuds pour un lot de coordonnées en une seule requête
+     * (exploite l'index unique uniq_road_node_coord). Retourne une map
+     * coordKey => id. Scalable (une requête par lot, pas par nœud).
+     *
+     * @param array<int, array{0: float, 1: float}> $coords
+     * @return array<string, int>
+     */
+    public function findIdsByCoordinates(array $coords): array
+    {
+        if ($coords === []) {
+            return [];
+        }
+
+        $conn = $this->getEntityManager()->getConnection();
+        $tuples = [];
+        $params = [];
+        foreach ($coords as $c) {
+            $tuples[] = '(?, ?)';
+            $params[] = $c[0];
+            $params[] = $c[1];
+        }
+
+        $sql = 'SELECT id, lat, lng FROM road_node WHERE (lat, lng) IN ('
+            . implode(',', $tuples) . ')';
+        $rows = $conn->fetchAllAssociative($sql, $params);
+
+        $map = [];
+        foreach ($rows as $r) {
+            $key = self::coordKey((float) $r['lat'], (float) $r['lng']);
+            $map[$key] = (int) $r['id'];
+        }
+
+        return $map;
+    }
+
+    /**
      * Compte le nombre total de nœuds.
      */
     public function countNodes(): int
@@ -77,6 +123,6 @@ class RoadNodeRepository extends ServiceEntityRepository
      */
     public function truncate(): void
     {
-        $this->_em->getConnection()->executeStatement('TRUNCATE TABLE road_node');
+        $this->getEntityManager()->getConnection()->executeStatement('TRUNCATE TABLE road_node');
     }
 }

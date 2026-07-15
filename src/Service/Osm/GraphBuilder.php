@@ -2,22 +2,34 @@
 
 namespace App\Service\Osm;
 
-use App\Entity\RoadGraph;
-use App\Repository\RoadSegmentRepository;
 use App\Repository\RoadGraphRepository;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Service\Osm\CompilationResult;
+use App\Service\Osm\CompilePhase;
+use App\Service\Osm\WorldContext;
+use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
 
 /**
  * Phase 3-4 : Construction du graphe de navigation.
  * Implémente CompilerPhase.
+ *
+ * DBAL bulk (pas d'ORM) : pour des volumes de l'ordre de 40-80 M d'arêtes,
+ * persister/flusher une entité par arête est ×5-×10 plus lent. On insère en
+ * INSERT multi-lignes découpés par lot (INSERT_CHUNK), deux arêtes par segment
+ * (A→B et B→A, graphe non orienté). Mémoire bornée : on ne charge que le
+ * curseur de segments (BATCH_SIZE), jamais tout le graphe.
  */
 final class GraphBuilder implements CompilerPhase
 {
+    // Nombre de segments lus par curseur.
+    private const BATCH_SIZE = 5000;
+
+    // Nombre de lignes (arêtes) par INSERT bulk (paquets réseau MySQL).
+    private const INSERT_CHUNK = 5000;
+
     public function __construct(
-        private readonly RoadSegmentRepository $segmentRepository,
+        private readonly Connection $connection,
         private readonly RoadGraphRepository $graphRepository,
-        private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger,
     ) {}
 
@@ -38,58 +50,46 @@ final class GraphBuilder implements CompilerPhase
     }
 
     /**
-     * Construit le graphe à partir des segments existants (cursor-based).
+     * Construit le graphe à partir des segments existants (cursor-based, DBAL).
+     *
+     * @return array{edges_created: int, unique_nodes: int}
      */
     public function build(): array
     {
         $totalEdges = 0;
         $lastId = 0;
-        $batchSize = 5000;
 
         $this->graphRepository->truncate();
 
         while (true) {
-            $segments = $this->fetchSegments($batchSize, $lastId);
+            $segments = $this->fetchSegments(self::BATCH_SIZE, $lastId);
 
             if (empty($segments)) {
                 break;
             }
 
-            $edgesCreated = 0;
-            $this->em->beginTransaction();
+            $rows = [];
+            foreach ($segments as $seg) {
+                $segId = (int) $seg['id'];
+                $start = (int) $seg['node_start_id'];
+                $end = (int) $seg['node_end_id'];
 
-            try {
-                foreach ($segments as $segment) {
-                    $lastId = max($lastId, (int) $segment['id']);
+                $lastId = max($lastId, $segId);
 
-                    // Arête aller
-                    $edge = new RoadGraph(
-                        $segment['node_start_id'],
-                        $segment['node_end_id'],
-                        $segment['id']
-                    );
-                    $this->em->persist($edge);
-
-                    // Arête retour (bidirectionnel)
-                    $reverseEdge = new RoadGraph(
-                        $segment['node_end_id'],
-                        $segment['node_start_id'],
-                        $segment['id']
-                    );
-                    $this->em->persist($reverseEdge);
-
-                    $edgesCreated += 2;
+                // Arête aller (graphe bidirectionnel : on stocke les deux sens).
+                $rows[] = [$start, $end, $segId];
+                // Pas d'arête retour si c'est une boucle (start == end) :
+                // les deux sens seraient identiques -> doublon sur uniq_road_graph.
+                if ($start !== $end) {
+                    $rows[] = [$end, $start, $segId];
                     $totalEdges += 2;
+                } else {
+                    $totalEdges += 1;
                 }
-
-                $this->em->flush();
-                $this->em->clear();
-                $this->em->commit();
-
-            } catch (\Throwable $e) {
-                $this->em->rollback();
-                throw $e;
             }
+
+            $this->insertEdgesBulk($rows);
+            gc_mem_caches();
 
             $this->logger->info(sprintf('Graphe : %d arêtes créées', $totalEdges));
         }
@@ -101,27 +101,54 @@ final class GraphBuilder implements CompilerPhase
     }
 
     /**
-     * Récupère les segments (cursor-based).
+     * Insère les arêtes en INSERT multi-lignes découpés (paquets MySQL).
+     *
+     * @param array<int, array{0: int, 1: int, 2: int}> $rows [nodeId, neighborId, segmentId]
+     */
+    private function insertEdgesBulk(array $rows): void
+    {
+        if ($rows === []) {
+            return;
+        }
+
+        foreach (array_chunk($rows, self::INSERT_CHUNK) as $chunk) {
+            $parts = [];
+            $params = [];
+            foreach ($chunk as [$nodeId, $neighborId, $segmentId]) {
+                $parts[] = '(?, ?, ?)';
+                $params[] = $nodeId;
+                $params[] = $neighborId;
+                $params[] = $segmentId;
+            }
+
+            $this->connection->executeStatement(
+                'INSERT IGNORE INTO road_graph (node_id, neighbor_id, segment_id) VALUES '
+                . implode(',', $parts),
+                $params
+            );
+        }
+    }
+
+    /**
+     * Récupère les segments (cursor-based, DBAL direct).
+     *
+     * @return array<int, array{id: int, node_start_id: int, node_end_id: int}>
      */
     private function fetchSegments(int $limit, int $lastId): array
     {
-        return $this->segmentRepository->createQueryBuilder('s')
-            ->select('s.id', 's.nodeStartId', 's.nodeEndId')
-            ->where('s.id > :lastId')
-            ->setParameter('lastId', $lastId)
-            ->orderBy('s.id', 'ASC')
-            ->setMaxResults($limit)
-            ->getQuery()
-            ->getArrayResult();
+        return $this->connection->fetchAllAssociative(
+            'SELECT id, node_start_id, node_end_id
+             FROM road_segment WHERE id > ? ORDER BY id ASC LIMIT ?',
+            [$lastId, $limit],
+            [\Doctrine\DBAL\ParameterType::INTEGER, \Doctrine\DBAL\ParameterType::INTEGER]
+        );
     }
 
     private function getUniqueNodeCount(): int
     {
-        $conn = $this->em->getConnection();
-        $result = $conn->fetchOne(
+        return (int) $this->connection->fetchOne(
             'SELECT COUNT(DISTINCT node_id) FROM road_graph'
         );
-        return (int) $result;
     }
 
     public function findNeighbors(int $nodeId): array

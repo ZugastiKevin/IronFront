@@ -10,7 +10,6 @@ import { loadBuildingsFromData, setCurrentPlayerId } from '../buildings/building
 import { initDepositLayers, depositLayers } from './deposits/deposits.js';
 import { initFogOfWar } from './fogOfWar.js';
 import { initZoneDebugPanel } from './roads/zoneDebugPanel.js';
-import { initWorldExpansionProgressPanel } from './worldExpansionProgressPanel.js';
 import { syncKnownZones } from './roads/zoneSync.js';
 import { roadsLayer } from './roads/roadsLayer.js';
 
@@ -64,11 +63,6 @@ export async function initMap(lat, lng) {
 
     // Panneau de debug des zones
     initZoneDebugPanel();
-
-    // Panneau de progression de l'expansion (admin seulement)
-    if (isAdmin) {
-        initWorldExpansionProgressPanel();
-    }
 
     // Charge la liste des zones en base pour l'overlay "non fetché"
     syncKnownZones().then(async (count) => {

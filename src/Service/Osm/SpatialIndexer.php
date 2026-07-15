@@ -20,7 +20,13 @@ use Psr\Log\LoggerInterface;
  */
 class SpatialIndexer implements CompilerPhase
 {
+    // Nombre de segments lus par curseur.
     private const BATCH_SIZE = 5000;
+
+    // Nombre de lignes par INSERT bulk (paquets réseau MySQL / max_allowed_packet).
+    // Un segment peut traverser des milliers de cellules (bbox longue) ; on
+    // découpe pour ne jamais générer un INSERT géant.
+    private const INSERT_CHUNK = 5000;
 
     public function __construct(
         private readonly RoadSegmentRepository $segmentRepository,
@@ -95,6 +101,10 @@ class SpatialIndexer implements CompilerPhase
             $totalCells += $cellsInserted;
             $totalRelations += $relationsInserted;
 
+            // Rend la mémoire libre à l'OS (sous charge soutenue, PHP ne le fait
+            // pas seul) — cohérent avec RoadNormalizer.
+            gc_mem_caches();
+
             $this->logger->info(sprintf(
                 'Index spatial : %d relations, %d cellules (lot)',
                 count($relRows),
@@ -139,16 +149,21 @@ class SpatialIndexer implements CompilerPhase
             return 0;
         }
 
-        $placeholders = implode(',', array_fill(0, count($cellRows), '(?,?,?,?,?,?,?)'));
-        $params = [];
-        foreach ($cellRows as $row) {
-            array_push($params, $row[0], $row[1], $row[2], $row[3], $row[4], $row[5], $row[6]);
+        $inserted = 0;
+        foreach (array_chunk($cellRows, self::INSERT_CHUNK) as $chunk) {
+            $placeholders = implode(',', array_fill(0, count($chunk), '(?,?,?,?,?,?,?)'));
+            $params = [];
+            foreach ($chunk as $row) {
+                array_push($params, $row[0], $row[1], $row[2], $row[3], $row[4], $row[5], $row[6]);
+            }
+
+            $inserted += $this->connection->executeStatement(
+                'INSERT IGNORE INTO spatial_cell (id, x, y, lat_min, lat_max, lng_min, lng_max) VALUES ' . $placeholders,
+                $params
+            );
         }
 
-        return $this->connection->executeStatement(
-            'INSERT IGNORE INTO spatial_cell (id, x, y, lat_min, lat_max, lng_min, lng_max) VALUES ' . $placeholders,
-            $params
-        );
+        return $inserted;
     }
 
     /**
@@ -160,16 +175,21 @@ class SpatialIndexer implements CompilerPhase
             return 0;
         }
 
-        $placeholders = implode(',', array_fill(0, count($relRows), '(?,?)'));
-        $params = [];
-        foreach ($relRows as $row) {
-            array_push($params, $row[0], $row[1]);
+        $inserted = 0;
+        foreach (array_chunk($relRows, self::INSERT_CHUNK) as $chunk) {
+            $placeholders = implode(',', array_fill(0, count($chunk), '(?,?)'));
+            $params = [];
+            foreach ($chunk as $row) {
+                array_push($params, $row[0], $row[1]);
+            }
+
+            $inserted += $this->connection->executeStatement(
+                'INSERT INTO spatial_segment (cell_id, segment_id) VALUES ' . $placeholders,
+                $params
+            );
         }
 
-        return $this->connection->executeStatement(
-            'INSERT INTO spatial_segment (cell_id, segment_id) VALUES ' . $placeholders,
-            $params
-        );
+        return $inserted;
     }
 
     private function fetchSegments(int $limit, int $lastId): array
@@ -202,7 +222,7 @@ class SpatialIndexer implements CompilerPhase
 
         return $this->segmentRepository->createQueryBuilder('s')
             ->where('s.id IN (:ids)')
-            ->setParameter('ids', $segmentIds)
+            ->setParameter('ids', $segmentIds, ArrayParameterType::INTEGER)
             ->getQuery()
             ->getResult();
     }
@@ -235,7 +255,7 @@ class SpatialIndexer implements CompilerPhase
 
         return $this->segmentRepository->createQueryBuilder('s')
             ->where('s.id IN (:ids)')
-            ->setParameter('ids', $segmentIds)
+            ->setParameter('ids', $segmentIds, ArrayParameterType::INTEGER)
             ->getQuery()
             ->getResult();
     }

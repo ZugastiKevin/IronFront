@@ -66,9 +66,33 @@ class WorldCompileCommand extends Command
         ;
     }
 
+    private static function memoryLimitToBytes(string $limit): int
+    {
+        $limit = trim($limit);
+        if ($limit === '-1') {
+            return -1;
+        }
+        $unit = strtolower(substr($limit, -1));
+        $value = (int) $limit;
+
+        return match ($unit) {
+            'g' => $value * 1024 * 1024 * 1024,
+            'm' => $value * 1024 * 1024,
+            'k' => $value * 1024,
+            default => $value,
+        };
+    }
+
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        ini_set('memory_limit', '6144M');
+        // Respecte un memory_limit plus élevé fourni via -d (ex. -d memory_limit=10G)
+        // ou la variable d'env OSM_MEMORY_LIMIT ; sinon plafond par défaut à 10 Go.
+        // (Un -d plus élevé doit primer sur cette valeur par défaut.)
+        $desired = getenv('OSM_MEMORY_LIMIT') !== false ? (string) getenv('OSM_MEMORY_LIMIT') : '10240M';
+        $current = self::memoryLimitToBytes((string) ini_get('memory_limit'));
+        if ($current === -1 || self::memoryLimitToBytes($desired) > $current) {
+            ini_set('memory_limit', $desired);
+        }
 
         $io = new SymfonyStyle($input, $output);
         $regionFilter = $input->getOption('region');
